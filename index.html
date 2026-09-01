@@ -3,104 +3,45 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sound Design Tutor Synth</title>
+<title>Signal Path — Sound Design Tutor Synth</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
-    <h1>Sound Design Tutor Synth</h1>
+    <div class="brand">
+      <span class="brand-mark">◎</span>
+      <h1>Signal Path <span class="brand-sub">— a synth that explains itself</span></h1>
+    </div>
     <div id="mcp-status" class="mcp-status mcp-status--off">
       <span class="dot"></span>
       <span class="label">WebMCP: checking…</span>
     </div>
   </header>
 
-  <main class="layout">
-    <section class="panel">
-      <h2>Waveform</h2>
-      <div id="waveform-buttons" class="waveform-buttons">
-        <button class="wave-btn active" data-waveform="sine" aria-label="Sine wave">
-          <svg viewBox="0 0 40 24"><path d="M2 12 C 8 2, 12 2, 20 12 S 32 22, 38 12" /></svg>
-          <span>Sine</span>
-        </button>
-        <button class="wave-btn" data-waveform="triangle" aria-label="Triangle wave">
-          <svg viewBox="0 0 40 24"><path d="M2 12 L 11 2 L 20 12 L 29 22 L 38 12" /></svg>
-          <span>Triangle</span>
-        </button>
-        <button class="wave-btn" data-waveform="sawtooth" aria-label="Saw wave">
-          <svg viewBox="0 0 40 24"><path d="M2 20 L 2 20 L 20 4 L 20 20 L 38 4" /></svg>
-          <span>Saw</span>
-        </button>
-        <button class="wave-btn" data-waveform="square" aria-label="Square wave">
-          <svg viewBox="0 0 40 24"><path d="M2 4 L 2 4 L 2 20 L 20 20 L 20 4 L 38 4 L 38 20" /></svg>
-          <span>Square</span>
-        </button>
-      </div>
-      <p id="reason-waveform" class="reason"></p>
-    </section>
+  <section class="presets-row">
+    <span class="presets-label">Start here</span>
+    <div id="presets" class="presets"></div>
+    <button id="surprise-btn" class="surprise-btn">🎲 Surprise me</button>
+  </section>
 
-    <section class="panel">
-      <h2>Filter</h2>
-      <div class="control-row">
-        <label for="cutoff">Cutoff <span id="cutoff-value" class="value"></span></label>
-        <input type="range" id="cutoff" min="0" max="100" step="0.1" value="70" />
-      </div>
-      <div class="control-row">
-        <label for="resonance">Resonance <span id="resonance-value" class="value"></span></label>
-        <input type="range" id="resonance" min="0" max="20" step="0.1" value="1" />
-      </div>
-      <p id="reason-filter" class="reason"></p>
-    </section>
-
-    <section class="panel">
-      <h2>Envelope</h2>
-      <div class="control-row">
-        <label for="attack">Attack <span id="attack-value" class="value"></span></label>
-        <input type="range" id="attack" min="0.001" max="2" step="0.001" value="0.02" />
-      </div>
-      <div class="control-row">
-        <label for="decay">Decay <span id="decay-value" class="value"></span></label>
-        <input type="range" id="decay" min="0.001" max="2" step="0.001" value="0.15" />
-      </div>
-      <div class="control-row">
-        <label for="sustain">Sustain <span id="sustain-value" class="value"></span></label>
-        <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.6" />
-      </div>
-      <div class="control-row">
-        <label for="release">Release <span id="release-value" class="value"></span></label>
-        <input type="range" id="release" min="0.001" max="3" step="0.001" value="0.3" />
-      </div>
-      <svg id="envelope-viz" viewBox="0 0 200 60" class="envelope-viz">
-        <polyline points="0,58 0,58" />
-      </svg>
-      <p id="reason-envelope" class="reason"></p>
-    </section>
-
-    <section class="panel">
-      <h2>Effect <span class="effect-name">(Delay)</span></h2>
-      <div class="control-row">
-        <label for="effect-enabled">Enabled</label>
-        <input type="checkbox" id="effect-enabled" />
-      </div>
-      <div class="control-row">
-        <label for="effect-mix">Mix <span id="effect-mix-value" class="value"></span></label>
-        <input type="range" id="effect-mix" min="0" max="1" step="0.01" value="0.3" />
-      </div>
-      <p id="reason-effect" class="reason"></p>
-    </section>
-
-    <aside class="panel reasoning-log">
-      <h2>Reasoning Log</h2>
-      <p class="hint">Ask the agent for a sound (e.g. "make it warmer") and the last few changes with their explanations will show up here.</p>
-      <ul id="reasoning-log-list"></ul>
-    </aside>
+  <main class="signal-path" id="signal-path">
+    <!-- oscillator, filter, envelope, effect, output modules injected by ui.js,
+         each separated by an animated "cable" connector -->
   </main>
+
+  <section class="panel reasoning-log">
+    <h2>Reasoning Log</h2>
+    <p class="hint">Ask the agent for a sound (e.g. "make it warmer") and the last few changes with their explanations build up here.</p>
+    <ul id="reasoning-log-list"></ul>
+  </section>
 
   <section class="keyboard-panel">
     <h2>Keyboard <span class="hint">(click or use A S D F G H J K, W E T Y U for black keys)</span></h2>
     <div id="keyboard" class="keyboard"></div>
   </section>
 
+  <script src="js/knob.js"></script>
+  <script src="js/presets.js"></script>
   <script src="js/audio-engine.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/webmcp-tools.js"></script>

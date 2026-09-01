@@ -7,10 +7,16 @@ const NOTE_FREQS = {
   'A#4': 466.16, B4: 493.88, C5: 523.25,
 };
 
+const DEFAULT_OSCILLATORS = [
+  { waveform: 'sawtooth', level: 1, detune: 0, semitone: 0 },
+  { waveform: 'square', level: 0, detune: 6, semitone: 0 },
+  { waveform: 'sine', level: 0, detune: 0, semitone: -12 },
+];
+
 class SynthEngine {
   constructor() {
     this.ctx = null;
-    this.waveform = 'sawtooth';
+    this.oscillators = DEFAULT_OSCILLATORS.map((o) => ({ ...o }));
     this.filterFreq = 2000;
     this.filterQ = 1;
     this.envelope = { attack: 0.02, decay: 0.15, sustain: 0.6, release: 0.3 };
@@ -37,8 +43,22 @@ class SynthEngine {
     this.filterNode.Q.value = this.filterQ;
 
     this.masterGain = ctx.createGain();
-    this.masterGain.gain.value = 0.8;
-    this.masterGain.connect(ctx.destination);
+    this.masterGain.gain.value = 0.7;
+
+    // Limiter: 3 mixed oscillators plus resonance can push well past 0dB
+    // (agent-driven or preset combos included) — catch it before it clips.
+    this.limiter = ctx.createDynamicsCompressor();
+    this.limiter.threshold.value = -6;
+    this.limiter.knee.value = 2;
+    this.limiter.ratio.value = 20;
+    this.limiter.attack.value = 0.002;
+    this.limiter.release.value = 0.1;
+
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.masterGain.connect(this.limiter);
+    this.limiter.connect(this.analyser);
+    this.analyser.connect(ctx.destination);
 
     // Dry path: filter output straight to master.
     this.dryGain = ctx.createGain();
@@ -61,9 +81,27 @@ class SynthEngine {
     this.wetGain.connect(this.masterGain);
   }
 
-  setWaveform(waveform) {
-    this.waveform = waveform;
-    if (this.activeVoice) this.activeVoice.osc.type = waveform;
+  setOscillator(index, { waveform, level, detune, semitone } = {}) {
+    const osc = this.oscillators[index];
+    if (!osc) return;
+    if (waveform != null) osc.waveform = waveform;
+    if (level != null) osc.level = level;
+    if (detune != null) osc.detune = detune;
+    if (semitone != null) osc.semitone = semitone;
+
+    const live = this.activeVoice?.voices[index];
+    if (live) {
+      if (waveform != null) live.osc.type = waveform;
+      if (level != null) live.gain.gain.setTargetAtTime(level, this.ctx.currentTime, 0.01);
+      if (detune != null) live.osc.detune.setTargetAtTime(detune, this.ctx.currentTime, 0.01);
+      if (semitone != null) {
+        live.osc.frequency.setTargetAtTime(
+          this.activeVoice.baseFreq * Math.pow(2, osc.semitone / 12),
+          this.ctx.currentTime,
+          0.01
+        );
+      }
+    }
   }
 
   setFilter({ cutoff, resonance } = {}) {
@@ -97,21 +135,44 @@ class SynthEngine {
     }
   }
 
+  loadPreset(preset) {
+    if (preset.oscillators) {
+      preset.oscillators.forEach((o, i) => this.setOscillator(i, o));
+      this.oscillators = preset.oscillators.map((o) => ({ ...o }));
+    }
+    if (preset.filter) this.setFilter(preset.filter);
+    if (preset.envelope) this.setEnvelope(preset.envelope);
+    if (preset.effect) this.setEffect(preset.effect);
+  }
+
   noteOn(freq) {
     const ctx = this.ensureContext();
-    // Cut off any currently-sounding voice immediately (monophonic).
     this._killActiveVoice();
 
-    const osc = ctx.createOscillator();
-    osc.type = this.waveform;
-    osc.frequency.value = freq;
+    const mixNode = ctx.createGain();
+    mixNode.gain.value = 1;
+    mixNode.connect(this.filterNode);
+
+    const voices = this.oscillators.map((oscDef) => {
+      const osc = ctx.createOscillator();
+      osc.type = oscDef.waveform;
+      osc.frequency.value = freq * Math.pow(2, oscDef.semitone / 12);
+      osc.detune.value = oscDef.detune;
+
+      const gain = ctx.createGain();
+      gain.gain.value = oscDef.level;
+
+      osc.connect(gain);
+      gain.connect(mixNode);
+      osc.start();
+      return { osc, gain };
+    });
 
     const envGain = ctx.createGain();
     envGain.gain.value = 0;
-
-    osc.connect(envGain);
+    mixNode.disconnect();
+    mixNode.connect(envGain);
     envGain.connect(this.filterNode);
-    osc.start();
 
     const now = ctx.currentTime;
     const { attack, decay, sustain } = this.envelope;
@@ -123,12 +184,12 @@ class SynthEngine {
       now + attack + Math.max(decay, 0.001)
     );
 
-    this.activeVoice = { osc, envGain };
+    this.activeVoice = { voices, mixNode, envGain, baseFreq: freq };
   }
 
   noteOff() {
     if (!this.activeVoice || !this.ctx) return;
-    const { osc, envGain } = this.activeVoice;
+    const { voices, mixNode, envGain } = this.activeVoice;
     const ctx = this.ctx;
     const now = ctx.currentTime;
     const release = Math.max(this.envelope.release, 0.02);
@@ -137,25 +198,42 @@ class SynthEngine {
     envGain.gain.setValueAtTime(envGain.gain.value, now);
     envGain.gain.linearRampToValueAtTime(0, now + release);
 
-    osc.stop(now + release + 0.05);
-    osc.addEventListener('ended', () => {
-      osc.disconnect();
-      envGain.disconnect();
+    const stopAt = now + release + 0.05;
+    voices.forEach(({ osc }) => {
+      osc.stop(stopAt);
+      osc.addEventListener('ended', () => osc.disconnect());
     });
+    setTimeout(() => {
+      voices.forEach(({ gain }) => gain.disconnect());
+      mixNode.disconnect();
+      envGain.disconnect();
+    }, (release + 0.1) * 1000);
 
     this.activeVoice = null;
   }
 
   _killActiveVoice() {
     if (!this.activeVoice) return;
-    const { osc, envGain } = this.activeVoice;
-    try {
-      osc.stop();
-    } catch (e) {
-      /* already stopped */
-    }
-    osc.disconnect();
+    const { voices, mixNode, envGain } = this.activeVoice;
+    voices.forEach(({ osc, gain }) => {
+      try {
+        osc.stop();
+      } catch (e) {
+        /* already stopped */
+      }
+      osc.disconnect();
+      gain.disconnect();
+    });
+    mixNode.disconnect();
     envGain.disconnect();
     this.activeVoice = null;
+  }
+
+  // Time-domain samples for the oscilloscope, -1..1 range.
+  getScopeSamples() {
+    if (!this.analyser) return null;
+    const data = new Float32Array(this.analyser.fftSize);
+    this.analyser.getFloatTimeDomainData(data);
+    return data;
   }
 }
