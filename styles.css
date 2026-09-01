@@ -368,14 +368,33 @@ body {
 .knob-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 
 /* Envelope: graph fills the left half, its 4 knobs sit as a 2x2 grid on
-   the right instead of a single row, so the module doesn't get too wide. */
-.envelope-body { display: flex; align-items: center; gap: 16px; }
-.envelope-body .envelope-viz { flex: 1 1 50%; min-width: 0; }
+   the right instead of a single row, so the module doesn't get too wide.
+   align-items:stretch + height:100% (overriding the fixed-height default)
+   lets the graph grow to match the knob grid's full height instead of
+   sitting small and centered with empty grey space around it. */
+.envelope-body { display: flex; align-items: stretch; gap: 16px; }
+.envelope-body .envelope-viz { flex: 1 1 50%; min-width: 0; height: 100%; }
 .knob-grid {
   flex: 1 1 50%;
   display: grid;
   grid-template-columns: repeat(2, auto);
   gap: 10px 18px;
+  justify-content: center;
+  align-content: center;
+}
+
+/* Filter: same idea as Envelope but a single knob column (only 2 knobs),
+   so the curve extends left to fill whatever width the knobs don't need. */
+.filter-body { display: flex; align-items: stretch; gap: 16px; }
+/* Override the shared width:100% (which would become the flex-basis and
+   fight the knob column for space) so flex-grow can actually distribute
+   the row between the curve and the knobs. */
+.filter-body .filter-curve { flex: 1 1 auto; width: auto; min-width: 0; height: 100%; }
+.knob-col {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   justify-content: center;
 }
 

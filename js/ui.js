@@ -245,7 +245,6 @@ function buildFilterModule(engine, onLogged) {
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 90;
   canvas.className = 'filter-curve';
-  module.append(canvas);
 
   const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ);
 
@@ -265,7 +264,10 @@ function buildFilterModule(engine, onLogged) {
     onChange: (q) => { engine.setFilter({ resonance: q }); redraw(); onLogged('filter'); },
   });
 
-  module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el]));
+  // Curve extends left to fill whatever room the knob column doesn't need,
+  // same left-graph/right-knobs idea as Envelope.
+  const knobCol = el('div', 'knob-col', [cutoffKnob.el, resonanceKnob.el]);
+  module.append(el('div', 'filter-body', [canvas, knobCol]));
   module.append(annotationSlot('filter'));
   redraw();
 
@@ -300,7 +302,11 @@ function buildEnvelopeModule(engine, onLogged) {
   const module = el('section', 'module module--envelope');
   module.append(moduleTitle('Envelope'));
 
-  const svg = svgEl('svg', { viewBox: '0 0 120 90', class: 'envelope-viz' });
+  // preserveAspectRatio="none": without it, the SVG letterboxes to keep the
+  // viewBox's 120:90 ratio, leaving visible empty bars once this box is
+  // stretched to match the knob grid's height/width — none lets the drawn
+  // curve fill the actual box exactly, edge to edge.
+  const svg = svgEl('svg', { viewBox: '0 0 120 90', preserveAspectRatio: 'none', class: 'envelope-viz' });
   svg.append(svgEl('polyline', { class: 'fill', points: '0,88 0,88' }));
   svg.append(svgEl('polyline', { class: 'line', points: '0,88 0,88' }));
 
