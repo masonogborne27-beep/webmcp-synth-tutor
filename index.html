@@ -21,13 +21,19 @@
   <section class="agent-panel">
     <div class="agent-header">
       <h2>Ask the agent</h2>
-      <button id="agent-key-toggle" class="agent-key-toggle" type="button">⚙ API key needed</button>
+      <div class="agent-header-controls">
+        <select id="agent-provider-select" class="agent-provider-select">
+          <option value="gemini">Gemini</option>
+          <option value="claude">Claude</option>
+        </select>
+        <button id="agent-key-toggle" class="agent-key-toggle" type="button">⚙ API key needed</button>
+      </div>
     </div>
     <div id="agent-key-row" class="agent-key-row" hidden>
-      <input id="agent-key-input" type="password" placeholder="Paste your free Gemini API key" autocomplete="off" />
+      <input id="agent-key-input" type="password" placeholder="Paste your API key" autocomplete="off" />
       <button id="agent-key-save" type="button">Save</button>
-      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free key</a>
-      <span class="agent-key-hint">Stored only in this browser (localStorage) — sent only to Google's API, never anywhere else.</span>
+      <a id="agent-key-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key</a>
+      <span class="agent-key-hint">Stored only in this browser (localStorage) — sent only to the provider's API, never anywhere else.</span>
     </div>
     <div id="agent-log" class="agent-log">
       <div class="agent-msg agent-msg--status">Type what you want the sound to feel like — "warmer", "punchier bass", "a lo-fi beat" — and the agent will turn the actual knobs and explain why. Keep going: each reply builds on the last.</div>

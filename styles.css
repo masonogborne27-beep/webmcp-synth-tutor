@@ -84,6 +84,17 @@ body {
   letter-spacing: 0.08em;
   color: var(--accent);
 }
+.agent-header-controls { display: flex; align-items: center; gap: 8px; }
+.agent-provider-select {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+}
 .agent-key-toggle {
   background: transparent;
   border: 1px solid var(--border);

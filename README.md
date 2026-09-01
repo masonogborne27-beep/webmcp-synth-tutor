@@ -13,16 +13,23 @@ FL Studio / Vital-adjacent language a beginner could carry into any other DAW.
 
 ## Try it
 
-Click a preset to get a real sound going immediately (no blank-slate problem), then either
-turn the knobs yourself or type something vague and creative into a connected agent, e.g.:
+The **Ask the agent** box at the top is the fastest way in: paste a free API key (Gemini or
+Claude — pick either from the dropdown, stored only in your browser), then type something
+vague and creative:
 
 - "make it sound warmer"
 - "more like a lo-fi beat"
 - "give me a punchier bass"
 - "what does resonance do?"
 
+The agent decides which real tool functions to call, executes them, and replies in plain
+language. Keep going — follow-ups like "no, even warmer" refine from where it left off, since
+conversation history persists for the session. No key handy? Click a preset instead to get a
+real sound going immediately (no blank-slate problem), then turn the knobs yourself.
+
 Watch the reasoning appear as an annotation on the module that changed, and build up in the
-reasoning log below the diagram.
+reasoning log below the diagram — this happens whether the agent was driven by the built-in
+chat, or by an external WebMCP-capable agent (see below).
 
 ## Signal chain
 
@@ -35,10 +42,11 @@ reasoning log below the diagram.
           -> Limiter -> Master output
 ```
 
-Monophonic — one note at a time, played from the on-screen keyboard (mouse or
-`A S D F G H J K` for white keys, `W E T Y U` for black keys, one octave from C4). The
-whole chain is drawn as a live schematic: a filter-response curve, an ADSR shape, and a
-real oscilloscope on the output stage, so you can *see* the sound design, not just hear it.
+Monophonic — one note at a time, played from a 4-octave on-screen keyboard (C2-C6; mouse-
+clickable across the whole range, or `A S D F G H J K` / `W E T Y U` for the current octave,
+with `Z`/`X` shifting which octave those keys play). The whole chain is drawn as a live
+schematic: a filter-response curve, an ADSR shape, and a real oscilloscope on the output
+stage, so you can *see* the sound design, not just hear it.
 
 ## Presets
 
@@ -46,9 +54,23 @@ Six starting points (Warm Pad, Punchy Bass, Lo-Fi Beat, Bright Pluck, Ambient Dr
 Lead) plus a "Surprise me" randomizer — pick one, then turn any knob to hear what it does
 from a real sound instead of silence.
 
-## WebMCP tools
+## The agent, two ways
 
-Registered via `document.modelContext.registerTool()`:
+1. **Built-in chat (primary path)** — `js/agent.js` calls Gemini or Claude directly from the
+   browser with the tool definitions below as function declarations, executes whatever the
+   model decides to call, and shows its reply in a chat log. This works for any visitor, in
+   any normal browser, no special setup beyond pasting their own API key.
+2. **WebMCP (`document.modelContext.registerTool()`)** — the same tool definitions are also
+   registered with the browser's native WebMCP API when present, so an agentic browser
+   (ChatGPT's in-app browser, or Chrome with `#enable-webmcp-testing`) can drive the page
+   directly, no chat UI or API key involved. This is what the Devpost challenge is actually
+   about — the built-in chat is what makes the same experience available to everyone else.
+
+Both paths share one source of truth: `buildToolDefs()` in `js/webmcp-tools.js` returns the
+tool list once, and both the WebMCP registration and the Agent class consume it, so the two
+paths can never drift apart.
+
+## WebMCP tools
 
 | Tool | Purpose |
 | --- | --- |
