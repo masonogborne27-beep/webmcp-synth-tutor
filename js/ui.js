@@ -133,9 +133,33 @@ function drawOscWaveform(canvas, waveform, level) {
 
 function buildOscillatorModule(index, engine, onLogged) {
   const module = el('section', 'module module--osc');
-  module.append(moduleTitle(`OSC ${index + 1}`));
 
   const oscState = { waveform: engine.oscillators[index].waveform, level: engine.oscillators[index].level };
+  // Remembers where the level knob was before the power dot muted it, so
+  // clicking back on restores the same depth instead of jumping to full.
+  let lastLevel = oscState.level > 0.001 ? oscState.level : 1;
+
+  const powerBtn = el('button', 'osc-power');
+  powerBtn.type = 'button';
+  const updatePower = () => {
+    const on = oscState.level > 0.001;
+    powerBtn.classList.toggle('on', on);
+    powerBtn.setAttribute('aria-pressed', String(on));
+    powerBtn.title = `Oscillator ${index + 1}: ${on ? 'on' : 'off'} — click to ${on ? 'mute' : 'unmute'}`;
+  };
+  powerBtn.addEventListener('click', () => {
+    const turningOn = oscState.level <= 0.001;
+    if (!turningOn) lastLevel = oscState.level;
+    const newLevel = turningOn ? lastLevel : 0;
+    engine.setOscillator(index, { level: newLevel });
+    oscState.level = newLevel;
+    levelKnob.setReal(newLevel);
+    updatePower();
+    redrawWave();
+    onLogged(`oscillator-${index}`);
+  });
+  module.append(el('h3', 'module-title', [powerBtn, `OSC ${index + 1}`]));
+
   const canvas = document.createElement('canvas');
   canvas.width = 220; canvas.height = 56;
   canvas.className = 'osc-viz';
@@ -155,7 +179,10 @@ function buildOscillatorModule(index, engine, onLogged) {
     format: (v) => v.toFixed(2),
     onChange: (v) => {
       engine.setOscillator(index, { level: v });
-      oscState.level = v; redrawWave();
+      oscState.level = v;
+      if (v > 0.001) lastLevel = v;
+      updatePower();
+      redrawWave();
       onLogged(`oscillator-${index}`);
     },
   });
@@ -169,14 +196,20 @@ function buildOscillatorModule(index, engine, onLogged) {
 
   module.append(el('div', 'knob-row', [levelKnob.el, tuneKnob.el]));
   module.append(annotationSlot(`oscillator-${index}`));
+  updatePower();
   redrawWave();
 
   return {
     module,
     setState({ waveform, level, semitone }) {
       if (waveform != null) { waveMini._setActive(waveform); oscState.waveform = waveform; }
-      if (level != null) { levelKnob.setReal(level); oscState.level = level; }
+      if (level != null) {
+        levelKnob.setReal(level);
+        oscState.level = level;
+        if (level > 0.001) lastLevel = level;
+      }
       if (semitone != null) tuneKnob.setReal(semitone);
+      updatePower();
       redrawWave();
     },
   };

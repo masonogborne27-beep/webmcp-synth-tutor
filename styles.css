@@ -375,6 +375,28 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Power dot: filled = oscillator contributing to the mix, hollow = muted.
+   Sits where the old numbered badge used to be. */
+.osc-power {
+  width: 12px; height: 12px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.osc-power:hover { border-color: var(--accent); }
+.osc-power.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 7px rgba(94, 234, 212, 0.7);
 }
 
 .knob-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
