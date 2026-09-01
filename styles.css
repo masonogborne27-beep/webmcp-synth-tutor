@@ -367,6 +367,18 @@ body {
 
 .knob-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 
+/* Envelope: graph fills the left half, its 4 knobs sit as a 2x2 grid on
+   the right instead of a single row, so the module doesn't get too wide. */
+.envelope-body { display: flex; align-items: center; gap: 16px; }
+.envelope-body .envelope-viz { flex: 1 1 50%; min-width: 0; }
+.knob-grid {
+  flex: 1 1 50%;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 10px 18px;
+  justify-content: center;
+}
+
 /* ---------- waveform mini selector ---------- */
 .wave-mini { display: flex; gap: 5px; }
 .wave-mini-btn {

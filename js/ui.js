@@ -303,7 +303,6 @@ function buildEnvelopeModule(engine, onLogged) {
   const svg = svgEl('svg', { viewBox: '0 0 120 90', class: 'envelope-viz' });
   svg.append(svgEl('polyline', { class: 'fill', points: '0,88 0,88' }));
   svg.append(svgEl('polyline', { class: 'line', points: '0,88 0,88' }));
-  module.append(svg);
 
   const state = { ...engine.envelope };
   const redraw = () => drawEnvelopeViz(svg, state);
@@ -329,7 +328,9 @@ function buildEnvelopeModule(engine, onLogged) {
     knobs[key] = knob;
     return knob.el;
   });
-  module.append(el('div', 'knob-row', knobEls));
+  // Graph on the left half, the 4 knobs as a 2x2 grid on the right half.
+  const knobGrid = el('div', 'knob-grid', knobEls);
+  module.append(el('div', 'envelope-body', [svg, knobGrid]));
   module.append(annotationSlot('envelope'));
   redraw();
 
