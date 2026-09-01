@@ -160,7 +160,7 @@ function buildOscillatorModule(index, engine, onLogged) {
   module.append(el('h3', 'module-title', [powerBtn, `OSC ${index + 1}`]));
 
   const canvas = document.createElement('canvas');
-  canvas.width = 220; canvas.height = 56;
+  canvas.width = 320; canvas.height = 90;
   canvas.className = 'osc-viz';
   const redrawWave = () => drawOscWaveform(canvas, oscState.waveform, oscState.level);
   module.append(canvas);
@@ -243,7 +243,7 @@ function buildFilterModule(engine, onLogged) {
   module.append(moduleTitle('Filter'));
 
   const canvas = document.createElement('canvas');
-  canvas.width = 220; canvas.height = 56;
+  canvas.width = 320; canvas.height = 90;
   canvas.className = 'filter-curve';
   module.append(canvas);
 
@@ -280,7 +280,7 @@ function buildFilterModule(engine, onLogged) {
 }
 
 function drawEnvelopeViz(svg, env) {
-  const w = 120, h = 48, floor = h - 2;
+  const w = 120, h = 90, floor = h - 2;
   const totalTime = Math.max(env.attack + env.decay + env.release, 0.3) * 1.4;
   const holdFrac = 0.35;
   const x1 = (env.attack / totalTime) * w;
@@ -300,9 +300,9 @@ function buildEnvelopeModule(engine, onLogged) {
   const module = el('section', 'module module--envelope');
   module.append(moduleTitle('Envelope'));
 
-  const svg = svgEl('svg', { viewBox: '0 0 120 48', class: 'envelope-viz' });
-  svg.append(svgEl('polyline', { class: 'fill', points: '0,46 0,46' }));
-  svg.append(svgEl('polyline', { class: 'line', points: '0,46 0,46' }));
+  const svg = svgEl('svg', { viewBox: '0 0 120 90', class: 'envelope-viz' });
+  svg.append(svgEl('polyline', { class: 'fill', points: '0,88 0,88' }));
+  svg.append(svgEl('polyline', { class: 'line', points: '0,88 0,88' }));
   module.append(svg);
 
   const state = { ...engine.envelope };
@@ -385,7 +385,7 @@ function buildEffectModule(engine, onLogged) {
 function buildOutputModule(engine) {
   const module = el('div', 'output-scope');
   const canvas = document.createElement('canvas');
-  canvas.width = 800; canvas.height = 200;
+  canvas.width = 800; canvas.height = 100;
   canvas.className = 'scope';
   module.append(canvas, el('div', 'output-scope-label', ['Output']));
 
