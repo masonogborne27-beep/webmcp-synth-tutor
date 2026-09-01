@@ -2,12 +2,21 @@
 // have a real LLM decide which of our WebMCP tool functions to call, execute
 // them for real, and reply in plain language — then keep refining across
 // follow-ups. Works for anyone, not just visitors using an agentic browser
-// that supports WebMCP. Supports two providers (Gemini, Claude) since a
-// region/age/account block on one shouldn't leave a visitor stuck.
+// that supports WebMCP.
+//
+// Default experience needs zero setup: "Shared" routes through a tiny
+// Cloudflare Worker (../worker/index.js) holding one Anthropic key as a
+// server-side secret, so a visitor never sees or needs an API key. Gemini
+// and Claude "bring your own key" options remain available as a fallback
+// (e.g. if the shared backend is rate-limited, or someone wants to use their
+// own account) — same tool defs, same execute() functions, either way.
 
 const AGENT_PROVIDER_STORAGE = 'signal_path_agent_provider';
 const AGENT_KEY_STORAGE_PREFIX = 'signal_path_api_key_';
 const AGENT_MODEL_CACHE_PREFIX = 'signal_path_model_';
+
+// Filled in once the Worker is deployed (see worker/wrangler.toml).
+const SHARED_WORKER_URL = 'https://signal-path-agent-proxy.mason-mcp-synth.workers.dev';
 
 function getStoredApiKey(provider) {
   return localStorage.getItem(AGENT_KEY_STORAGE_PREFIX + provider) || '';
@@ -17,7 +26,7 @@ function setStoredApiKey(provider, key) {
   else localStorage.removeItem(AGENT_KEY_STORAGE_PREFIX + provider);
 }
 function getStoredProvider() {
-  return localStorage.getItem(AGENT_PROVIDER_STORAGE) || 'gemini';
+  return localStorage.getItem(AGENT_PROVIDER_STORAGE) || 'shared';
 }
 function setStoredProvider(provider) {
   localStorage.setItem(AGENT_PROVIDER_STORAGE, provider);
@@ -35,10 +44,56 @@ const SYSTEM_TEXT =
   'after only calling functions with no reply text. If the user asks a pure question with no ' +
   'change to make, use explain_parameter and relay its answer conversationally.';
 
-// ---- Gemini provider ----
+// ---- Shared provider (default, no key needed) ----
+const SharedProvider = {
+  id: 'shared',
+  label: 'Shared (no key needed)',
+  needsKey: false,
+
+  async resolveModel() { return ''; }, // model choice lives server-side
+  toDeclarations(toolDefs) {
+    return toolDefs.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  },
+  newHistory() { return []; },
+  appendUserText(history, text) { history.push({ role: 'user', content: text }); },
+
+  async requestTurn(history, model, apiKey, declarations) {
+    const res = await fetch(SHARED_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system: SYSTEM_TEXT, messages: history, tools: declarations }),
+    });
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      throw new Error(`The shared agent is unavailable right now (${res.status}). Try a "bring your own key" provider from the dropdown instead. ${bodyText.slice(0, 150)}`);
+    }
+    const data = await res.json();
+    const content = data.content || [];
+    history.push({ role: 'assistant', content });
+    const functionCalls = content
+      .filter((b) => b.type === 'tool_use')
+      .map((b) => ({ id: b.id, name: b.name, args: b.input }));
+    const textReply = content.filter((b) => b.type === 'text').map((b) => b.text).join(' ').trim();
+    return { functionCalls, textReply: functionCalls.length ? null : (textReply || '(no reply text)') };
+  },
+
+  appendFunctionResults(history, resultsByCall) {
+    history.push({
+      role: 'user',
+      content: resultsByCall.map(({ id, resultText }) => ({
+        type: 'tool_result',
+        tool_use_id: id,
+        content: resultText,
+      })),
+    });
+  },
+};
+
+// ---- Gemini provider (bring your own key) ----
 const GeminiProvider = {
   id: 'gemini',
-  label: 'Gemini',
+  label: 'Gemini (your key)',
+  needsKey: true,
   keyPlaceholder: 'Paste your free Gemini API key',
   getKeyUrl: 'https://aistudio.google.com/apikey',
 
@@ -113,10 +168,11 @@ const GeminiProvider = {
   },
 };
 
-// ---- Claude (Anthropic) provider ----
+// ---- Claude provider (bring your own key) ----
 const ClaudeProvider = {
   id: 'claude',
-  label: 'Claude',
+  label: 'Claude (your key)',
+  needsKey: true,
   keyPlaceholder: 'Paste your Claude API key (sk-ant-...)',
   getKeyUrl: 'https://platform.claude.com/settings/keys',
 
@@ -197,7 +253,7 @@ const ClaudeProvider = {
   },
 };
 
-const PROVIDERS = { gemini: GeminiProvider, claude: ClaudeProvider };
+const PROVIDERS = { shared: SharedProvider, gemini: GeminiProvider, claude: ClaudeProvider };
 
 class Agent {
   constructor(toolDefs, provider) {
@@ -213,11 +269,14 @@ class Agent {
 
   async send(userText, { onStatus } = {}) {
     const provider = this.provider;
-    const apiKey = getStoredApiKey(provider.id);
-    if (!apiKey) {
-      const err = new Error('No API key saved yet.');
-      err.code = 'NO_KEY';
-      throw err;
+    let apiKey = '';
+    if (provider.needsKey) {
+      apiKey = getStoredApiKey(provider.id);
+      if (!apiKey) {
+        const err = new Error('No API key saved yet.');
+        err.code = 'NO_KEY';
+        throw err;
+      }
     }
     onStatus?.('thinking');
     const model = await provider.resolveModel(apiKey);
@@ -266,11 +325,17 @@ function initAgentPanel(toolDefs) {
   const input = document.getElementById('agent-input');
   const sendBtn = document.getElementById('agent-send');
 
-  let currentProvider = PROVIDERS[getStoredProvider()] || PROVIDERS.gemini;
+  let currentProvider = PROVIDERS[getStoredProvider()] || PROVIDERS.shared;
   providerSelect.value = currentProvider.id;
   const agent = new Agent(toolDefs, currentProvider);
 
   const refreshForProvider = () => {
+    if (!currentProvider.needsKey) {
+      keyToggle.hidden = true;
+      keyRow.hidden = true;
+      return;
+    }
+    keyToggle.hidden = false;
     const has = !!getStoredApiKey(currentProvider.id);
     keyToggle.textContent = has ? `⚙ ${currentProvider.label} key ✓` : `⚙ ${currentProvider.label} key needed`;
     keyToggle.classList.toggle('agent-key-toggle--set', has);
@@ -310,7 +375,7 @@ function initAgentPanel(toolDefs) {
     const text = input.value.trim();
     if (!text || busy) return;
 
-    if (!getStoredApiKey(currentProvider.id)) {
+    if (currentProvider.needsKey && !getStoredApiKey(currentProvider.id)) {
       appendChatMessage('status', `Add a ${currentProvider.label} API key first (⚙ above).`);
       keyRow.hidden = false;
       keyInput.focus();

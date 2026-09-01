@@ -56,10 +56,12 @@ from a real sound instead of silence.
 
 ## The agent, two ways
 
-1. **Built-in chat (primary path)** — `js/agent.js` calls Gemini or Claude directly from the
-   browser with the tool definitions below as function declarations, executes whatever the
-   model decides to call, and shows its reply in a chat log. This works for any visitor, in
-   any normal browser, no special setup beyond pasting their own API key.
+1. **Built-in chat (primary path)** — `js/agent.js` calls an LLM directly from the browser
+   with the tool definitions below as function declarations, executes whatever the model
+   decides to call, and shows its reply in a chat log. By default this needs **zero setup**:
+   it routes through a shared backend (see below) using one Claude key that isn't visible to
+   the visitor. "Bring your own key" Gemini/Claude options remain in the provider dropdown as
+   a fallback.
 2. **WebMCP (`document.modelContext.registerTool()`)** — the same tool definitions are also
    registered with the browser's native WebMCP API when present, so an agentic browser
    (ChatGPT's in-app browser, or Chrome with `#enable-webmcp-testing`) can drive the page
@@ -69,6 +71,27 @@ from a real sound instead of silence.
 Both paths share one source of truth: `buildToolDefs()` in `js/webmcp-tools.js` returns the
 tool list once, and both the WebMCP registration and the Agent class consume it, so the two
 paths can never drift apart.
+
+### Shared agent backend
+
+A static site can't hide a secret — anything the browser can read, a visitor can read. So the
+zero-setup default routes through a tiny Cloudflare Worker (`worker/index.js`) that holds one
+Anthropic API key as a server-side secret and proxies Messages API requests for it. It's the
+only server-side code in the whole project.
+
+To deploy your own copy:
+
+```bash
+cd worker
+npx wrangler login                          # one-time Cloudflare auth
+npx wrangler secret put ANTHROPIC_API_KEY   # paste your key when prompted — never in a script
+npx wrangler deploy
+```
+
+Then update `SHARED_WORKER_URL` in `js/agent.js` to the printed `*.workers.dev` URL, and add
+that same URL (plus whatever origin you serve the frontend from) to `ALLOWED_ORIGINS` in
+`worker/index.js`. The Worker also caps request size and restricts CORS to those origins as
+basic abuse protection, since one key now covers every visitor's usage.
 
 ## WebMCP tools
 

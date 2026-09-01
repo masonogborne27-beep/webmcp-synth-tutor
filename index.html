@@ -23,10 +23,11 @@
       <h2>Ask the agent</h2>
       <div class="agent-header-controls">
         <select id="agent-provider-select" class="agent-provider-select">
-          <option value="gemini">Gemini</option>
-          <option value="claude">Claude</option>
+          <option value="shared">Shared (no key needed)</option>
+          <option value="gemini">Gemini (your key)</option>
+          <option value="claude">Claude (your key)</option>
         </select>
-        <button id="agent-key-toggle" class="agent-key-toggle" type="button">⚙ API key needed</button>
+        <button id="agent-key-toggle" class="agent-key-toggle" type="button" hidden>⚙ API key needed</button>
       </div>
     </div>
     <div id="agent-key-row" class="agent-key-row" hidden>
@@ -36,7 +37,7 @@
       <span class="agent-key-hint">Stored only in this browser (localStorage) — sent only to the provider's API, never anywhere else.</span>
     </div>
     <div id="agent-log" class="agent-log">
-      <div class="agent-msg agent-msg--status">Type what you want the sound to feel like — "warmer", "punchier bass", "a lo-fi beat" — and the agent will turn the actual knobs and explain why. Keep going: each reply builds on the last.</div>
+      <div class="agent-msg agent-msg--status">Type what you want the sound to feel like — "warmer", "punchier bass", "a lo-fi beat" — and the agent will turn the actual knobs and explain why. Keep going: each reply builds on the last. No account or API key needed — this runs on a shared backend by default.</div>
     </div>
     <form id="agent-form" class="agent-form">
       <input id="agent-input" type="text" placeholder='Try "make it sound warmer"' autocomplete="off" />
