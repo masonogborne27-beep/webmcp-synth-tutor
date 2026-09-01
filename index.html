@@ -18,8 +18,28 @@
     </div>
   </header>
 
+  <section class="agent-panel">
+    <div class="agent-header">
+      <h2>Ask the agent</h2>
+      <button id="agent-key-toggle" class="agent-key-toggle" type="button">⚙ API key needed</button>
+    </div>
+    <div id="agent-key-row" class="agent-key-row" hidden>
+      <input id="agent-key-input" type="password" placeholder="Paste your free Gemini API key" autocomplete="off" />
+      <button id="agent-key-save" type="button">Save</button>
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free key</a>
+      <span class="agent-key-hint">Stored only in this browser (localStorage) — sent only to Google's API, never anywhere else.</span>
+    </div>
+    <div id="agent-log" class="agent-log">
+      <div class="agent-msg agent-msg--status">Type what you want the sound to feel like — "warmer", "punchier bass", "a lo-fi beat" — and the agent will turn the actual knobs and explain why. Keep going: each reply builds on the last.</div>
+    </div>
+    <form id="agent-form" class="agent-form">
+      <input id="agent-input" type="text" placeholder='Try "make it sound warmer"' autocomplete="off" />
+      <button id="agent-send" type="submit">Send</button>
+    </form>
+  </section>
+
   <section class="presets-row">
-    <span class="presets-label">Start here</span>
+    <span class="presets-label">...or start here</span>
     <div id="presets" class="presets"></div>
     <button id="surprise-btn" class="surprise-btn">🎲 Surprise me</button>
   </section>
@@ -51,6 +71,7 @@
   <script src="js/audio-engine.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/webmcp-tools.js"></script>
+  <script src="js/agent.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

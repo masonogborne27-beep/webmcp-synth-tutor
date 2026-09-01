@@ -1,6 +1,8 @@
-// Registers WebMCP tools per https://webmachinelearning.github.io/webmcp/
-// Each execute() drives the same engine + UI update functions the knobs use,
-// so agent-driven changes and manual changes behave identically.
+// Tool definitions shared by two callers: the WebMCP registration (for
+// agentic browsers like ChatGPT's in-app browser or Chrome+flag) and our own
+// built-in Agent panel (js/agent.js), which drives the exact same execute()
+// functions from a plain LLM function-calling loop. One source of truth so
+// "the agent" behaves identically regardless of which path invoked it.
 
 const PARAM_EXPLANATIONS = {
   oscillator:
@@ -39,181 +41,191 @@ const REASON_FIELD = {
   description:
     'A short (1-2 sentence) plain-language explanation of why you are making this change, ' +
     'written for a beginner. Always include this — it is shown directly in the UI next to ' +
-    'the module you just changed.',
+    'the module you just changed, and read back to the user as your reply.',
 };
 
-function registerWebMcpTools({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
-  if (!document.modelContext || typeof document.modelContext.registerTool !== 'function') {
-    return false;
-  }
-
+// Returns the tool definitions as plain data + execute functions, independent
+// of WebMCP. Both registerWebMcpTools() and the Agent panel consume this.
+function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
   const withReason = (parameter, reason) => {
     if (reason) addReasoningLogEntry(parameter, reason);
   };
 
-  document.modelContext.registerTool({
-    name: 'set_oscillator',
-    description:
-      'Configure one of the synth\'s 3 mixable oscillators (oscillator: 1, 2, or 3). This ' +
-      'is the primary way to shape tone color and thickness. waveform sets harmonic ' +
-      'character: "warmer"/"softer"/"purer"/"flute-like" -> sine or triangle; "brighter"/' +
-      '"fuller"/"analog"/"buzzy"/"classic synth" -> sawtooth; "hollow"/"retro"/"video-game"/' +
-      '"reedy" -> square. level (0-1) sets how loud that oscillator sits in the mix — set an ' +
-      'unused oscillator to 0 rather than leaving it at a stale value. semitone (-24 to 24, ' +
-      'integer) coarse-tunes that oscillator relative to the note played: -12 makes a sub-bass ' +
-      'layer an octave down, +7/+12 stacks a fifth/octave above for a fuller chord-like tone. ' +
-      'detune (-50 to 50 cents) is a small pitch offset used for classic analog "unison" ' +
-      'thickening/chorus-like width when two oscillators share a waveform with opposite detune. ' +
-      'For "thicker"/"fatter"/"wider" requests, raise a second oscillator\'s level and detune it ' +
-      'slightly opposite the first. For "simpler"/"cleaner" requests, lower unused oscillators to 0.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        oscillator: { type: 'integer', enum: [1, 2, 3], description: 'Which oscillator (1-3) to edit.' },
-        waveform: { type: 'string', enum: ['sine', 'square', 'sawtooth', 'triangle'] },
-        level: { type: 'number', minimum: 0, maximum: 1 },
-        detune: { type: 'number', minimum: -50, maximum: 50, description: 'Fine detune in cents.' },
-        semitone: { type: 'integer', minimum: -24, maximum: 24, description: 'Coarse tune in semitones.' },
-        reason: REASON_FIELD,
+  return [
+    {
+      name: 'set_oscillator',
+      description:
+        'Configure one of the synth\'s 3 mixable oscillators (oscillator: 1, 2, or 3). This ' +
+        'is the primary way to shape tone color and thickness. waveform sets harmonic ' +
+        'character: "warmer"/"softer"/"purer"/"flute-like" -> sine or triangle; "brighter"/' +
+        '"fuller"/"analog"/"buzzy"/"classic synth" -> sawtooth; "hollow"/"retro"/"video-game"/' +
+        '"reedy" -> square. level (0-1) sets how loud that oscillator sits in the mix — set an ' +
+        'unused oscillator to 0 rather than leaving it at a stale value. semitone (-24 to 24, ' +
+        'integer) coarse-tunes that oscillator relative to the note played: -12 makes a sub-bass ' +
+        'layer an octave down, +7/+12 stacks a fifth/octave above for a fuller chord-like tone. ' +
+        'detune (-50 to 50 cents) is a small pitch offset used for classic analog "unison" ' +
+        'thickening/chorus-like width when two oscillators share a waveform with opposite detune. ' +
+        'For "thicker"/"fatter"/"wider" requests, raise a second oscillator\'s level and detune it ' +
+        'slightly opposite the first. For "simpler"/"cleaner" requests, lower unused oscillators to 0.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          oscillator: { type: 'integer', enum: [1, 2, 3], description: 'Which oscillator (1-3) to edit.' },
+          waveform: { type: 'string', enum: ['sine', 'square', 'sawtooth', 'triangle'] },
+          level: { type: 'number', minimum: 0, maximum: 1 },
+          detune: { type: 'number', minimum: -50, maximum: 50, description: 'Fine detune in cents.' },
+          semitone: { type: 'integer', minimum: -24, maximum: 24, description: 'Coarse tune in semitones.' },
+          reason: REASON_FIELD,
+        },
+        required: ['oscillator'],
       },
-      required: ['oscillator'],
-    },
-    execute: async ({ oscillator, waveform, level, detune, semitone, reason }) => {
-      const index = oscillator - 1;
-      engine.setOscillator(index, { waveform, level, detune, semitone });
-      oscUIs[index].setState({ waveform, level, semitone });
-      withReason(`oscillator-${index}`, reason);
-      return `Oscillator ${oscillator} updated.`;
-    },
-  });
-
-  document.modelContext.registerTool({
-    name: 'set_filter',
-    description:
-      'Adjust the lowpass filter that shapes brightness/warmth, applied after the oscillator ' +
-      'mix. cutoff (20-20000 Hz): lower = warmer/darker/muddier/duller, higher = brighter/' +
-      'thinner/harsher/more present. For "warmer", "muddy", "lo-fi", "underwater" requests, ' +
-      'lower the cutoff (roughly 300-1200 Hz for very warm/muffled, 1500-4000 Hz for gentle ' +
-      'warmth). For "brighter", "crisper", "cutting through the mix", raise it (5000 Hz+). ' +
-      'resonance (0-20) emphasizes frequencies right at the cutoff: a little (1-4) adds ' +
-      'character or a "wah"/nasal quality, a lot (8+) gets squelchy/acid-like or can ' +
-      'self-oscillate into a whistle. Either field can be omitted to leave it unchanged.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        cutoff: { type: 'number', minimum: 20, maximum: 20000 },
-        resonance: { type: 'number', minimum: 0, maximum: 20 },
-        reason: REASON_FIELD,
+      execute: async ({ oscillator, waveform, level, detune, semitone, reason }) => {
+        const index = oscillator - 1;
+        engine.setOscillator(index, { waveform, level, detune, semitone });
+        oscUIs[index].setState({ waveform, level, semitone });
+        withReason(`oscillator-${index}`, reason);
+        return `Oscillator ${oscillator} updated.`;
       },
     },
-    execute: async ({ cutoff, resonance, reason }) => {
-      engine.setFilter({ cutoff, resonance });
-      filterUI.setState({ cutoff, resonance });
-      withReason('filter', reason);
-      const parts = [];
-      if (cutoff != null) parts.push(`cutoff to ${Math.round(cutoff)} Hz`);
-      if (resonance != null) parts.push(`resonance to ${resonance.toFixed(1)}`);
-      return `Set ${parts.join(' and ')}.`;
-    },
-  });
-
-  document.modelContext.registerTool({
-    name: 'set_envelope',
-    description:
-      'Adjust the ADSR amplitude envelope, shared by the full oscillator mix. attack ' +
-      '(seconds) is fade-in time — near 0 is punchy/plucky/percussive, 0.3s+ is a slow swell ' +
-      'or pad-like fade-in. decay (seconds) is fall time from the attack peak to the sustain ' +
-      'level. sustain (0-1) is the held volume while a key is down, not a duration. release ' +
-      '(seconds) is fade-out time after the key is released — near 0 is abrupt/staccato, 1s+ ' +
-      'lingers/feels ambient. For "punchier"/"snappier" requests: fast attack, shorter decay, ' +
-      'lower sustain. For "softer"/"pad-like"/"ambient" requests: slower attack, longer release. ' +
-      'Any field can be omitted to leave it unchanged.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        attack: { type: 'number', minimum: 0, maximum: 5 },
-        decay: { type: 'number', minimum: 0, maximum: 5 },
-        sustain: { type: 'number', minimum: 0, maximum: 1 },
-        release: { type: 'number', minimum: 0, maximum: 5 },
-        reason: REASON_FIELD,
+    {
+      name: 'set_filter',
+      description:
+        'Adjust the lowpass filter that shapes brightness/warmth, applied after the oscillator ' +
+        'mix. cutoff (20-20000 Hz): lower = warmer/darker/muddier/duller, higher = brighter/' +
+        'thinner/harsher/more present. For "warmer", "muddy", "lo-fi", "underwater" requests, ' +
+        'lower the cutoff (roughly 300-1200 Hz for very warm/muffled, 1500-4000 Hz for gentle ' +
+        'warmth). For "brighter", "crisper", "cutting through the mix", raise it (5000 Hz+). ' +
+        'resonance (0-20) emphasizes frequencies right at the cutoff: a little (1-4) adds ' +
+        'character or a "wah"/nasal quality, a lot (8+) gets squelchy/acid-like or can ' +
+        'self-oscillate into a whistle. Either field can be omitted to leave it unchanged.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cutoff: { type: 'number', minimum: 20, maximum: 20000 },
+          resonance: { type: 'number', minimum: 0, maximum: 20 },
+          reason: REASON_FIELD,
+        },
+      },
+      execute: async ({ cutoff, resonance, reason }) => {
+        engine.setFilter({ cutoff, resonance });
+        filterUI.setState({ cutoff, resonance });
+        withReason('filter', reason);
+        const parts = [];
+        if (cutoff != null) parts.push(`cutoff to ${Math.round(cutoff)} Hz`);
+        if (resonance != null) parts.push(`resonance to ${resonance.toFixed(1)}`);
+        return `Set ${parts.join(' and ')}.`;
       },
     },
-    execute: async ({ attack, decay, sustain, release, reason }) => {
-      engine.setEnvelope({ attack, decay, sustain, release });
-      envelopeUI.setState({ attack, decay, sustain, release });
-      withReason('envelope', reason);
-      return 'Envelope updated.';
-    },
-  });
-
-  document.modelContext.registerTool({
-    name: 'set_effect',
-    description:
-      'Toggle and blend the synth\'s single built-in effect: a delay (echo). enabled turns it ' +
-      'on/off. mix (0-1): low (0.1-0.25) is a subtle thickening/slapback, high (0.4+) is ' +
-      'spacious, washed-out, dubby, "lo-fi" or ambient. Use for "add some space", "dreamy", ' +
-      '"lo-fi beat" (moderate mix plus a darker filter cutoff usually reads as "lo-fi"), or ' +
-      '"more atmospheric". Turn it off for "tight", "dry", or "direct".',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        enabled: { type: 'boolean' },
-        mix: { type: 'number', minimum: 0, maximum: 1 },
-        reason: REASON_FIELD,
+    {
+      name: 'set_envelope',
+      description:
+        'Adjust the ADSR amplitude envelope, shared by the full oscillator mix. attack ' +
+        '(seconds) is fade-in time — near 0 is punchy/plucky/percussive, 0.3s+ is a slow swell ' +
+        'or pad-like fade-in. decay (seconds) is fall time from the attack peak to the sustain ' +
+        'level. sustain (0-1) is the held volume while a key is down, not a duration. release ' +
+        '(seconds) is fade-out time after the key is released — near 0 is abrupt/staccato, 1s+ ' +
+        'lingers/feels ambient. For "punchier"/"snappier" requests: fast attack, shorter decay, ' +
+        'lower sustain. For "softer"/"pad-like"/"ambient" requests: slower attack, longer release. ' +
+        'Any field can be omitted to leave it unchanged.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          attack: { type: 'number', minimum: 0, maximum: 5 },
+          decay: { type: 'number', minimum: 0, maximum: 5 },
+          sustain: { type: 'number', minimum: 0, maximum: 1 },
+          release: { type: 'number', minimum: 0, maximum: 5 },
+          reason: REASON_FIELD,
+        },
       },
-      required: ['enabled'],
-    },
-    execute: async ({ enabled, mix, reason }) => {
-      engine.setEffect({ enabled, mix });
-      effectUI.setState({ enabled, mix });
-      withReason('effect', reason);
-      return `Delay ${enabled ? 'enabled' : 'disabled'}${mix != null ? ` at mix ${mix.toFixed(2)}` : ''}.`;
-    },
-  });
-
-  document.modelContext.registerTool({
-    name: 'load_preset',
-    description:
-      'Instantly load a complete, curated starting sound (all 3 oscillators, filter, ' +
-      'envelope, and effect at once), then optionally fine-tune individual parameters with ' +
-      'the other tools afterward. Use this as a fast, reliable first move for a vague request ' +
-      'before nudging individual knobs — e.g. "lo-fi beat" -> load_preset("lofi_beat") then ' +
-      'optionally tweak cutoff further. Available presets: ' +
-      PRESETS.map((p) => `"${p.id}" (${p.name})`).join(', ') + '.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        preset: { type: 'string', enum: PRESETS.map((p) => p.id) },
-        reason: REASON_FIELD,
+      execute: async ({ attack, decay, sustain, release, reason }) => {
+        engine.setEnvelope({ attack, decay, sustain, release });
+        envelopeUI.setState({ attack, decay, sustain, release });
+        withReason('envelope', reason);
+        return 'Envelope updated.';
       },
-      required: ['preset'],
     },
-    execute: async ({ preset: presetId, reason }) => {
-      const preset = PRESETS.find((p) => p.id === presetId);
-      if (!preset) return `Unknown preset: ${presetId}`;
-      engine.loadPreset(preset);
-      applyPresetToUI(preset, { oscUIs, filterUI, envelopeUI, effectUI });
-      withReason('preset', reason || `Loaded the "${preset.name}" preset as a starting point.`);
-      return `Loaded preset "${preset.name}".`;
-    },
-  });
-
-  document.modelContext.registerTool({
-    name: 'explain_parameter',
-    description:
-      'Return a plain-language, beginner-friendly explanation of what a synth parameter ' +
-      'category does and why it matters, using terminology a beginner could later recognize ' +
-      'in other DAWs (FL Studio, Ableton, Vital, etc). Call this when the user directly asks ' +
-      '"what does X do?" and there is no parameter change to make.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        parameter: { type: 'string', enum: ['oscillator', 'filter', 'envelope', 'effect'] },
+    {
+      name: 'set_effect',
+      description:
+        'Toggle and blend the synth\'s single built-in effect: a delay (echo). enabled turns it ' +
+        'on/off. mix (0-1): low (0.1-0.25) is a subtle thickening/slapback, high (0.4+) is ' +
+        'spacious, washed-out, dubby, "lo-fi" or ambient. Use for "add some space", "dreamy", ' +
+        '"lo-fi beat" (moderate mix plus a darker filter cutoff usually reads as "lo-fi"), or ' +
+        '"more atmospheric". Turn it off for "tight", "dry", or "direct".',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          enabled: { type: 'boolean' },
+          mix: { type: 'number', minimum: 0, maximum: 1 },
+          reason: REASON_FIELD,
+        },
+        required: ['enabled'],
       },
-      required: ['parameter'],
+      execute: async ({ enabled, mix, reason }) => {
+        engine.setEffect({ enabled, mix });
+        effectUI.setState({ enabled, mix });
+        withReason('effect', reason);
+        return `Delay ${enabled ? 'enabled' : 'disabled'}${mix != null ? ` at mix ${mix.toFixed(2)}` : ''}.`;
+      },
     },
-    execute: async ({ parameter }) => PARAM_EXPLANATIONS[parameter] || 'Unknown parameter.',
-  });
+    {
+      name: 'load_preset',
+      description:
+        'Instantly load a complete, curated starting sound (all 3 oscillators, filter, ' +
+        'envelope, and effect at once), then optionally fine-tune individual parameters with ' +
+        'the other tools afterward. Use this as a fast, reliable first move for a vague request ' +
+        'before nudging individual knobs — e.g. "lo-fi beat" -> load_preset("lofi_beat") then ' +
+        'optionally tweak cutoff further. Available presets: ' +
+        PRESETS.map((p) => `"${p.id}" (${p.name})`).join(', ') + '.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          preset: { type: 'string', enum: PRESETS.map((p) => p.id) },
+          reason: REASON_FIELD,
+        },
+        required: ['preset'],
+      },
+      execute: async ({ preset: presetId, reason }) => {
+        const preset = PRESETS.find((p) => p.id === presetId);
+        if (!preset) return `Unknown preset: ${presetId}`;
+        engine.loadPreset(preset);
+        applyPresetToUI(preset, { oscUIs, filterUI, envelopeUI, effectUI });
+        withReason('preset', reason || `Loaded the "${preset.name}" preset as a starting point.`);
+        return `Loaded preset "${preset.name}".`;
+      },
+    },
+    {
+      name: 'explain_parameter',
+      description:
+        'Return a plain-language, beginner-friendly explanation of what a synth parameter ' +
+        'category does and why it matters, using terminology a beginner could later recognize ' +
+        'in other DAWs (FL Studio, Ableton, Vital, etc). Call this when the user directly asks ' +
+        '"what does X do?" and there is no parameter change to make.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          parameter: { type: 'string', enum: ['oscillator', 'filter', 'envelope', 'effect'] },
+        },
+        required: ['parameter'],
+      },
+      execute: async ({ parameter }) => PARAM_EXPLANATIONS[parameter] || 'Unknown parameter.',
+    },
+  ];
+}
 
+// Registers every tool def with the browser's real WebMCP API, if present
+// (ChatGPT's in-app browser, or Chrome with #enable-webmcp-testing).
+function registerWebMcpTools(toolDefs) {
+  if (!document.modelContext || typeof document.modelContext.registerTool !== 'function') {
+    return false;
+  }
+  toolDefs.forEach((def) => {
+    document.modelContext.registerTool({
+      name: def.name,
+      description: def.description,
+      inputSchema: def.inputSchema,
+      execute: def.execute,
+    });
+  });
   return true;
 }

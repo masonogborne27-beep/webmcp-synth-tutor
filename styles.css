@@ -66,6 +66,135 @@ body {
 .mcp-status--on .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .mcp-status--on { color: var(--accent); border-color: var(--accent-dim); }
 
+/* ---------- agent panel ---------- */
+.agent-panel {
+  margin: 20px 24px 0;
+  background: var(--panel);
+  border: 1px solid var(--accent-dim);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 0 24px -8px rgba(126, 255, 192, 0.15);
+}
+.agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.agent-header h2 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+.agent-key-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+}
+.agent-key-toggle--set { border-color: var(--accent-dim); color: var(--accent); }
+
+.agent-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+.agent-key-row[hidden] { display: none; }
+.agent-key-row input[type="password"] {
+  flex: 1 1 220px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.agent-key-row button {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.agent-key-row a { color: var(--accent); font-size: 12px; }
+.agent-key-hint { flex-basis: 100%; font-size: 11px; color: var(--text-dim); }
+
+.agent-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px 2px 12px;
+  margin-bottom: 10px;
+}
+.agent-msg {
+  max-width: 80%;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.agent-msg--user {
+  align-self: flex-end;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.agent-msg--agent {
+  align-self: flex-start;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--text);
+}
+.agent-msg--status {
+  align-self: flex-start;
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 12.5px;
+  background: transparent;
+  padding: 2px 4px;
+}
+.agent-msg--error {
+  align-self: flex-start;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid var(--bad);
+  color: var(--bad);
+}
+
+.agent-form { display: flex; gap: 8px; }
+.agent-form input {
+  flex: 1;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.agent-form input:focus { outline: none; border-color: var(--accent); }
+.agent-form button {
+  background: var(--accent);
+  border: none;
+  color: #06130c;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+.agent-form button:disabled { opacity: 0.5; cursor: default; }
+
 /* ---------- presets ---------- */
 .presets-row {
   display: flex;

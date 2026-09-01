@@ -6,5 +6,8 @@ const uiHandles = buildSignalPath(engine, onLogged);
 initKeyboard(engine);
 initPresets(engine, uiHandles);
 
-const mcpReady = registerWebMcpTools({ engine, ...uiHandles });
+const toolDefs = buildToolDefs({ engine, ...uiHandles });
+const mcpReady = registerWebMcpTools(toolDefs);
 setMcpStatus(mcpReady);
+
+initAgentPanel(toolDefs);
