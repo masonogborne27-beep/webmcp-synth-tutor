@@ -54,9 +54,13 @@
     <button id="surprise-btn" class="surprise-btn">🎲 Surprise me</button>
   </section>
 
-  <main class="signal-path" id="signal-path">
-    <!-- oscillator, filter, envelope, effect, output modules injected by ui.js,
-         each separated by an animated "cable" connector -->
+  <main class="dashboard">
+    <div class="hero-row" id="hero-row">
+      <!-- Filter + Output: the two big Serum-style live visualizations -->
+    </div>
+    <div class="module-grid" id="module-grid">
+      <!-- OSC 1-3, Envelope, Delay: numbered step cards, Fieldwork-style grid -->
+    </div>
   </main>
 
   <section class="panel reasoning-log">

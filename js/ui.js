@@ -1,6 +1,7 @@
-// DOM wiring: signal-path diagram (oscillators/filter/envelope/effect/output),
-// keyboard, presets, reasoning log/annotations, status pill. Pure UI logic —
-// talks to a SynthEngine instance passed in, never creates one.
+// DOM wiring: dashboard (a hero row with big Filter/Output visualizations,
+// plus a wrapping grid of numbered oscillator/envelope/delay cards), keyboard,
+// presets, reasoning log/annotations, status pill. Pure UI logic — talks to a
+// SynthEngine instance passed in, never creates one.
 
 // Full playable range, not just one octave — a real MIDI controller's worth
 // (C2-C6, 4 octaves) so an average user can actually play a bassline and a
@@ -58,10 +59,9 @@ function svgEl(tag, attrs) {
   return node;
 }
 
-function cable() {
-  const c = el('div', 'cable');
-  c.append(el('span', 'cable-dot'));
-  return c;
+function moduleTitle(text, step) {
+  const badge = el('span', 'module-step', [String(step)]);
+  return el('h3', 'module-title', [badge, text]);
 }
 
 // ---- log-scale helpers for the filter cutoff knob ----
@@ -104,7 +104,7 @@ function annotationSlot(param) {
 
 function buildOscillatorModule(index, engine, onLogged) {
   const module = el('section', 'module module--osc');
-  module.append(el('h3', 'module-title', [`OSC ${index + 1}`]));
+  module.append(moduleTitle(`OSC ${index + 1}`, 1));
 
   const waveMini = buildWaveformMini(index, engine, () => onLogged(`oscillator-${index}`));
   module.append(waveMini);
@@ -162,13 +162,13 @@ function drawFilterCurve(canvas, cutoff, resonance) {
 }
 
 function buildFilterModule(engine, onLogged) {
-  const module = el('section', 'module module--filter');
-  module.append(el('h3', 'module-title', ['Filter']));
+  const module = el('section', 'module module--hero module--filter');
+  module.append(moduleTitle('Filter', 2));
 
   const canvas = document.createElement('canvas');
-  canvas.width = 120; canvas.height = 56;
-  canvas.className = 'filter-curve';
-  module.append(canvas);
+  canvas.width = 480; canvas.height = 120;
+  canvas.className = 'filter-curve hero-viz';
+  const body = el('div', 'hero-body');
 
   const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ);
 
@@ -188,7 +188,8 @@ function buildFilterModule(engine, onLogged) {
     onChange: (q) => { engine.setFilter({ resonance: q }); redraw(); onLogged('filter'); },
   });
 
-  module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el]));
+  body.append(canvas, el('div', 'knob-row knob-row--side', [cutoffKnob.el, resonanceKnob.el]));
+  module.append(body);
   module.append(annotationSlot('filter'));
   redraw();
 
@@ -221,7 +222,7 @@ function drawEnvelopeViz(svg, env) {
 
 function buildEnvelopeModule(engine, onLogged) {
   const module = el('section', 'module module--envelope');
-  module.append(el('h3', 'module-title', ['Envelope']));
+  module.append(moduleTitle('Envelope', 3));
 
   const svg = svgEl('svg', { viewBox: '0 0 120 48', class: 'envelope-viz' });
   svg.append(svgEl('polyline', { class: 'fill', points: '0,46 0,46' }));
@@ -271,7 +272,7 @@ function buildEnvelopeModule(engine, onLogged) {
 
 function buildEffectModule(engine, onLogged) {
   const module = el('section', 'module module--effect');
-  module.append(el('h3', 'module-title', ['Delay']));
+  module.append(moduleTitle('Delay', 4));
 
   const toggleWrap = el('label', 'toggle');
   const checkbox = document.createElement('input');
@@ -303,12 +304,12 @@ function buildEffectModule(engine, onLogged) {
 }
 
 function buildOutputModule(engine) {
-  const module = el('section', 'module module--output');
-  module.append(el('h3', 'module-title', ['Output']));
+  const module = el('section', 'module module--hero module--output');
+  module.append(moduleTitle('Output', 5));
   const canvas = document.createElement('canvas');
-  canvas.width = 130; canvas.height = 64;
-  canvas.className = 'scope';
-  module.append(canvas);
+  canvas.width = 480; canvas.height = 120;
+  canvas.className = 'scope hero-viz';
+  module.append(el('div', 'hero-body', [canvas]));
 
   const ctx = canvas.getContext('2d');
   const style = getComputedStyle(document.documentElement);
@@ -316,16 +317,23 @@ function buildOutputModule(engine) {
     requestAnimationFrame(draw);
     const samples = engine.getScopeSamples();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!samples) return;
     ctx.beginPath();
-    const step = Math.floor(samples.length / canvas.width) || 1;
-    for (let x = 0, i = 0; x < canvas.width; x++, i += step) {
-      const y = canvas.height / 2 - samples[i] * (canvas.height / 2 - 2);
-      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    if (!samples) {
+      // Idle placeholder before the first note is ever played (no analyser yet).
+      ctx.moveTo(0, canvas.height / 2);
+      ctx.lineTo(canvas.width, canvas.height / 2);
+    } else {
+      const step = Math.floor(samples.length / canvas.width) || 1;
+      for (let x = 0, i = 0; x < canvas.width; x++, i += step) {
+        const y = canvas.height / 2 - samples[i] * (canvas.height / 2 - 2);
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
     }
     ctx.strokeStyle = style.getPropertyValue('--accent').trim() || '#7effc0';
     ctx.lineWidth = 1.5;
+    ctx.globalAlpha = samples ? 1 : 0.25;
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
   draw();
 
@@ -333,22 +341,18 @@ function buildOutputModule(engine) {
 }
 
 function buildSignalPath(engine, onLogged) {
-  const root = document.getElementById('signal-path');
+  const heroRow = document.getElementById('hero-row');
+  const grid = document.getElementById('module-grid');
+
   const oscUIs = [0, 1, 2].map((i) => buildOscillatorModule(i, engine, onLogged));
   const filterUI = buildFilterModule(engine, onLogged);
   const envelopeUI = buildEnvelopeModule(engine, onLogged);
   const effectUI = buildEffectModule(engine, onLogged);
   const outputUI = buildOutputModule(engine);
 
-  oscUIs.forEach((o) => root.append(o.module));
-  root.append(cable());
-  root.append(filterUI.module);
-  root.append(cable());
-  root.append(envelopeUI.module);
-  root.append(cable());
-  root.append(effectUI.module);
-  root.append(cable());
-  root.append(outputUI.module);
+  heroRow.append(filterUI.module, outputUI.module);
+  oscUIs.forEach((o) => grid.append(o.module));
+  grid.append(envelopeUI.module, effectUI.module);
 
   return { oscUIs, filterUI, envelopeUI, effectUI, outputUI };
 }
