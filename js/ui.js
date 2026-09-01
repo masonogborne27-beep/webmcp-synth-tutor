@@ -36,8 +36,11 @@ function qwertyNoteName(semitoneOffset, octave) {
   return `${name}${noteOctave}`;
 }
 
-const WHITE_KEY_WIDTH = 34;
-const BLACK_KEY_WIDTH = 22;
+// Percentage-based, not fixed pixels, so the keyboard stretches to fill the
+// full width of its row instead of leaving a gap when the container is wider
+// than a fixed-size piano would be. Must track WHITE_KEYS.length — see below.
+const WHITE_KEY_WIDTH_PCT = 100 / WHITE_KEYS.length;
+const BLACK_KEY_WIDTH_PCT = WHITE_KEY_WIDTH_PCT * 0.62;
 
 const WAVE_PATHS = {
   sine: 'M2 12 C 5 3, 8 3, 12 12 S 19 21, 22 12',
@@ -469,7 +472,7 @@ function initKeyboard(engine) {
     const keyEl = makeKey('key black', '');
     keyEl.dataset.note = note;
     keyEl.style.position = 'absolute';
-    keyEl.style.left = `${(afterWhiteIndex + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2}px`;
+    keyEl.style.left = `${(afterWhiteIndex + 1) * WHITE_KEY_WIDTH_PCT - BLACK_KEY_WIDTH_PCT / 2}%`;
     container.appendChild(keyEl);
     keyEls[note] = keyEl;
   });

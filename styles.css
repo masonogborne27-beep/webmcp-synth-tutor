@@ -604,7 +604,7 @@ body {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
-.keyboard { position: relative; display: flex; height: 130px; user-select: none; width: max-content; }
+.keyboard { position: relative; display: flex; height: 130px; user-select: none; width: 100%; min-width: 640px; }
 .key {
   position: relative;
   border: 1px solid var(--border);
@@ -621,7 +621,7 @@ body {
 .key.white {
   background: linear-gradient(180deg, #fbfdfc 0%, #e4ede9 100%);
   color: #22302b;
-  width: 34px;
+  width: calc(100% / 29); /* must track WHITE_KEYS.length in js/ui.js */
   height: 100%;
   z-index: 1;
   border-radius: 0 0 8px 8px;
@@ -631,9 +631,8 @@ body {
 .key.black {
   background: linear-gradient(180deg, #262b33 0%, #05070a 100%);
   color: #a9f2e6;
-  width: 22px;
+  width: 2.14%; /* ~0.62 of a white key's width, matching BLACK_KEY_WIDTH_PCT in js/ui.js */
   height: 62%;
-  margin: 0 -11px;
   z-index: 2;
   border-radius: 0 0 6px 6px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
