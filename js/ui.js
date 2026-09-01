@@ -1,7 +1,8 @@
-// DOM wiring: dashboard (a hero row with big Filter/Output visualizations,
-// plus a wrapping grid of numbered oscillator/envelope/delay cards), keyboard,
-// presets, reasoning log/annotations, status pill. Pure UI logic — talks to a
-// SynthEngine instance passed in, never creates one.
+// DOM wiring: the signal chain (oscillators -> filter -> envelope -> delay,
+// connected by arrows so the layout itself shows the audio path) plus a
+// separate, deliberately dramatic Output scope, the keyboard, presets, and
+// inline speech-bubble annotations. Pure UI logic — talks to a SynthEngine
+// instance passed in, never creates one.
 
 // Full playable range, not just one octave — a real MIDI controller's worth
 // (C2-C6, 4 octaves) so an average user can actually play a bassline and a
@@ -59,9 +60,12 @@ function svgEl(tag, attrs) {
   return node;
 }
 
-function moduleTitle(text, step) {
-  const badge = el('span', 'module-step', [String(step)]);
-  return el('h3', 'module-title', [badge, text]);
+function moduleTitle(text) {
+  return el('h3', 'module-title', [text]);
+}
+
+function chainArrow() {
+  return el('div', 'chain-arrow', ['→']);
 }
 
 // ---- log-scale helpers for the filter cutoff knob ----
@@ -129,7 +133,7 @@ function drawOscWaveform(canvas, waveform, level) {
 
 function buildOscillatorModule(index, engine, onLogged) {
   const module = el('section', 'module module--osc');
-  module.append(moduleTitle(`OSC ${index + 1}`, 1));
+  module.append(moduleTitle(`OSC ${index + 1}`));
 
   const oscState = { waveform: engine.oscillators[index].waveform, level: engine.oscillators[index].level };
   const canvas = document.createElement('canvas');
@@ -203,13 +207,13 @@ function drawFilterCurve(canvas, cutoff, resonance) {
 }
 
 function buildFilterModule(engine, onLogged) {
-  const module = el('section', 'module module--hero module--filter');
-  module.append(moduleTitle('Filter', 2));
+  const module = el('section', 'module module--filter');
+  module.append(moduleTitle('Filter'));
 
   const canvas = document.createElement('canvas');
-  canvas.width = 480; canvas.height = 120;
-  canvas.className = 'filter-curve hero-viz';
-  const body = el('div', 'hero-body');
+  canvas.width = 220; canvas.height = 56;
+  canvas.className = 'filter-curve';
+  module.append(canvas);
 
   const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ);
 
@@ -229,8 +233,7 @@ function buildFilterModule(engine, onLogged) {
     onChange: (q) => { engine.setFilter({ resonance: q }); redraw(); onLogged('filter'); },
   });
 
-  body.append(canvas, el('div', 'knob-row knob-row--side', [cutoffKnob.el, resonanceKnob.el]));
-  module.append(body);
+  module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el]));
   module.append(annotationSlot('filter'));
   redraw();
 
@@ -263,7 +266,7 @@ function drawEnvelopeViz(svg, env) {
 
 function buildEnvelopeModule(engine, onLogged) {
   const module = el('section', 'module module--envelope');
-  module.append(moduleTitle('Envelope', 3));
+  module.append(moduleTitle('Envelope'));
 
   const svg = svgEl('svg', { viewBox: '0 0 120 48', class: 'envelope-viz' });
   svg.append(svgEl('polyline', { class: 'fill', points: '0,46 0,46' }));
@@ -313,7 +316,7 @@ function buildEnvelopeModule(engine, onLogged) {
 
 function buildEffectModule(engine, onLogged) {
   const module = el('section', 'module module--effect');
-  module.append(moduleTitle('Delay', 4));
+  module.append(moduleTitle('Delay'));
 
   const toggleWrap = el('label', 'toggle');
   const checkbox = document.createElement('input');
@@ -344,13 +347,15 @@ function buildEffectModule(engine, onLogged) {
   };
 }
 
+// The one deliberately dramatic element on the page (a CRT-style glowing
+// trace) — everything else on the instrument stays quiet and disciplined
+// around it, by design.
 function buildOutputModule(engine) {
-  const module = el('section', 'module module--hero module--output');
-  module.append(moduleTitle('Output', 5));
+  const module = el('div', 'output-scope');
   const canvas = document.createElement('canvas');
-  canvas.width = 480; canvas.height = 120;
-  canvas.className = 'scope hero-viz';
-  module.append(el('div', 'hero-body', [canvas]));
+  canvas.width = 800; canvas.height = 200;
+  canvas.className = 'scope';
+  module.append(canvas, el('div', 'output-scope-label', ['Output']));
 
   const ctx = canvas.getContext('2d');
   const style = getComputedStyle(document.documentElement);
@@ -366,14 +371,18 @@ function buildOutputModule(engine) {
     } else {
       const step = Math.floor(samples.length / canvas.width) || 1;
       for (let x = 0, i = 0; x < canvas.width; x++, i += step) {
-        const y = canvas.height / 2 - samples[i] * (canvas.height / 2 - 2);
+        const y = canvas.height / 2 - samples[i] * (canvas.height / 2 - 6);
         if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
     }
-    ctx.strokeStyle = style.getPropertyValue('--accent').trim() || '#7effc0';
-    ctx.lineWidth = 1.5;
-    ctx.globalAlpha = samples ? 1 : 0.25;
+    const accent = style.getPropertyValue('--accent').trim() || '#7effc0';
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = samples ? 2.5 : 1.5;
+    ctx.globalAlpha = samples ? 1 : 0.2;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = samples ? 14 : 0;
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
   draw();
@@ -382,8 +391,8 @@ function buildOutputModule(engine) {
 }
 
 function buildSignalPath(engine, onLogged) {
-  const heroRow = document.getElementById('hero-row');
-  const grid = document.getElementById('module-grid');
+  const chain = document.getElementById('chain');
+  const outputHero = document.getElementById('output-hero');
 
   const oscUIs = [0, 1, 2].map((i) => buildOscillatorModule(i, engine, onLogged));
   const filterUI = buildFilterModule(engine, onLogged);
@@ -391,9 +400,16 @@ function buildSignalPath(engine, onLogged) {
   const effectUI = buildEffectModule(engine, onLogged);
   const outputUI = buildOutputModule(engine);
 
-  heroRow.append(filterUI.module, outputUI.module);
-  oscUIs.forEach((o) => grid.append(o.module));
-  grid.append(envelopeUI.module, effectUI.module);
+  const oscGroup = el('div', 'chain-group');
+  oscUIs.forEach((o) => oscGroup.append(o.module));
+
+  chain.append(
+    oscGroup, chainArrow(),
+    filterUI.module, chainArrow(),
+    envelopeUI.module, chainArrow(),
+    effectUI.module
+  );
+  outputHero.append(outputUI.module);
 
   return { oscUIs, filterUI, envelopeUI, effectUI, outputUI };
 }
@@ -542,38 +558,24 @@ function initPresets(engine, uiHandles) {
   });
 }
 
-// ---- reasoning log + inline annotations ----
-const MAX_LOG_ENTRIES = 4;
-const PARAM_LABELS = {
-  'oscillator-0': 'osc 1', 'oscillator-1': 'osc 2', 'oscillator-2': 'osc 3',
-  filter: 'filter', envelope: 'envelope', effect: 'delay', preset: 'preset',
-};
-
+// ---- inline speech-bubble annotations ----
 // `applied` is a deterministic summary read back from live engine state — see
 // webmcp-tools.js — always shown alongside the model's own `reason` prose so
 // a viewer can catch it directly if the two ever disagree, rather than
 // silently trusting the model's explanation as ground truth.
+// The speech-bubble pinned to the changed module is the only place this
+// reasoning appears now (there is no separate running log) — see the design
+// brief this was built against for why that consolidation happened.
 function addReasoningLogEntry(parameter, reason, applied) {
   if (!reason) return;
-  const list = document.getElementById('reasoning-log-list');
-  const li = document.createElement('li');
-  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const label = PARAM_LABELS[parameter] || parameter;
-  li.append(el('span', 'param', [label]), document.createTextNode(reason));
-  if (applied) li.append(el('span', 'applied', [` (set: ${applied})`]));
-  li.append(el('span', 'time', [time]));
-  list.prepend(li);
-  while (list.children.length > MAX_LOG_ENTRIES) list.removeChild(list.lastChild);
-
   const inline = document.getElementById(`reason-${parameter}`);
-  if (inline) {
-    inline.textContent = '';
-    inline.append(document.createTextNode(reason));
-    if (applied) inline.append(el('span', 'applied', [` (set: ${applied})`]));
-    inline.classList.remove('annotation--flash');
-    void inline.offsetWidth;
-    inline.classList.add('annotation--flash');
-  }
+  if (!inline) return;
+  inline.textContent = '';
+  inline.append(document.createTextNode(reason));
+  if (applied) inline.append(el('span', 'applied', [` (set: ${applied})`]));
+  inline.classList.remove('annotation--flash');
+  void inline.offsetWidth;
+  inline.classList.add('annotation--flash');
 }
 
 function setMcpStatus(ready) {
