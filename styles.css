@@ -383,21 +383,6 @@ body {
   align-content: center;
 }
 
-/* Filter: same idea as Envelope but a single knob column (only 2 knobs),
-   so the curve extends left to fill whatever width the knobs don't need. */
-.filter-body { display: flex; align-items: stretch; gap: 16px; }
-/* Override the shared width:100% (which would become the flex-basis and
-   fight the knob column for space) so flex-grow can actually distribute
-   the row between the curve and the knobs. */
-.filter-body .filter-curve { flex: 1 1 auto; width: auto; min-width: 0; height: 100%; }
-.knob-col {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  justify-content: center;
-}
-
 /* ---------- waveform mini selector ---------- */
 .wave-mini { display: flex; gap: 5px; }
 .wave-mini-btn {

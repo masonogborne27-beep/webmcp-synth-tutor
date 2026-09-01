@@ -245,6 +245,7 @@ function buildFilterModule(engine, onLogged) {
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 90;
   canvas.className = 'filter-curve';
+  module.append(canvas);
 
   const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ);
 
@@ -264,10 +265,7 @@ function buildFilterModule(engine, onLogged) {
     onChange: (q) => { engine.setFilter({ resonance: q }); redraw(); onLogged('filter'); },
   });
 
-  // Curve extends left to fill whatever room the knob column doesn't need,
-  // same left-graph/right-knobs idea as Envelope.
-  const knobCol = el('div', 'knob-col', [cutoffKnob.el, resonanceKnob.el]);
-  module.append(el('div', 'filter-body', [canvas, knobCol]));
+  module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el]));
   module.append(annotationSlot('filter'));
   redraw();
 
