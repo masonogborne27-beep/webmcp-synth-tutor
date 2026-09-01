@@ -320,7 +320,60 @@ function appendChatMessage(role, text) {
   return msg;
 }
 
+const AGENT_PANEL_POS_STORAGE = 'signal_path_agent_panel_pos';
+
+// Lets the floating agent panel be dragged anywhere by its header, clamped to
+// stay on-screen, with its last position remembered across reloads. Clicks on
+// real controls inside the header (the provider select, the key toggle) must
+// not start a drag.
+function makeDraggable(panel, handle) {
+  const saved = JSON.parse(localStorage.getItem(AGENT_PANEL_POS_STORAGE) || 'null');
+  if (saved) {
+    panel.style.left = `${saved.left}px`;
+    panel.style.top = `${saved.top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+
+  let dragging = false;
+  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const maxLeft = window.innerWidth - panel.offsetWidth - 4;
+    const maxTop = window.innerHeight - panel.offsetHeight - 4;
+    const left = Math.max(4, Math.min(startLeft + (e.clientX - startX), maxLeft));
+    const top = Math.max(4, Math.min(startTop + (e.clientY - startY), maxTop));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    const rect = panel.getBoundingClientRect();
+    localStorage.setItem(AGENT_PANEL_POS_STORAGE, JSON.stringify({ left: rect.left, top: rect.top }));
+  };
+  handle.addEventListener('mousedown', (e) => {
+    if (e.target.closest('select, button, input, a')) return;
+    dragging = true;
+    handle.classList.add('dragging');
+    const rect = panel.getBoundingClientRect();
+    startLeft = rect.left; startTop = rect.top;
+    startX = e.clientX; startY = e.clientY;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+}
+
 function initAgentPanel(toolDefs) {
+  makeDraggable(document.querySelector('.agent-panel'), document.querySelector('.agent-header'));
+
   const providerSelect = document.getElementById('agent-provider-select');
   const keyToggle = document.getElementById('agent-key-toggle');
   const keyRow = document.getElementById('agent-key-row');

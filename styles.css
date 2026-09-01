@@ -87,16 +87,42 @@ body {
 .mcp-status--on .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .mcp-status--on { color: var(--accent); border-color: var(--accent-dim); }
 
-/* ---------- agent panel ---------- */
+/* ---------- agent panel: a free-floating, draggable window ---------- */
 .agent-panel {
-  margin: 8px 24px 0;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  z-index: 60;
   background: var(--panel);
   border: 1px solid var(--accent-dim);
   border-radius: var(--radius);
   padding: 18px 20px;
-  box-shadow: var(--shadow), 0 0 32px -12px rgba(94, 234, 212, 0.18);
+  box-shadow: var(--shadow), 0 0 32px -12px rgba(94, 234, 212, 0.28);
 }
-.agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.agent-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-right: 18px;
+  cursor: grab;
+  user-select: none;
+}
+.agent-header.dragging { cursor: grabbing; }
+.agent-header::after {
+  content: "⠿";
+  position: absolute;
+  top: 50%; right: 0;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 14px;
+  pointer-events: none;
+}
 .agent-header h2 {
   margin: 0;
   font-family: var(--mono);
@@ -434,24 +460,38 @@ body {
 .toggle input:checked + .toggle-track::after { transform: translateX(16px); background: var(--accent); }
 .toggle-label { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
 
-/* ---------- annotations (agent reasoning pinned to a module) ---------- */
+/* ---------- annotations: a speech bubble "spoken" by the agent, pinned to
+   the module it just changed, tail pointing up at the knobs above it ---------- */
 .annotation {
+  position: relative;
   min-height: 0;
   font-size: 11.5px;
-  color: var(--amber);
-  margin-top: 12px;
+  color: var(--text);
   line-height: 1.4;
-  border-top: 1px dashed transparent;
-  padding-top: 0;
 }
 .annotation:not(:empty) {
-  border-top: 1px dashed var(--amber-dim);
-  padding-top: 9px;
+  margin-top: 18px;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.annotation:not(:empty)::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 20px;
+  width: 12px;
+  height: 12px;
+  background: var(--amber-dim);
+  border-left: 1px solid var(--amber);
+  border-top: 1px solid var(--amber);
+  transform: rotate(45deg);
 }
 .annotation--flash { animation: annotation-flash 900ms ease-out; }
 @keyframes annotation-flash {
-  0% { background: var(--amber-dim); box-shadow: 0 0 0 4px var(--amber-dim); border-radius: 8px; }
-  100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+  0% { background: var(--amber); box-shadow: 0 0 0 5px var(--amber-dim); }
+  100% { background: var(--amber-dim); box-shadow: 0 0 0 0 transparent; }
 }
 
 /* ---------- reasoning log ---------- */
