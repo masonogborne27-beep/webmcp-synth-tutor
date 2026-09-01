@@ -1,12 +1,20 @@
 :root {
-  --bg: #0b0d10;
-  --bg-grid: #0e1013;
-  --panel: #14171c;
-  --panel-raised: #1a1e24;
-  --border: #262b33;
-  --seam: #333a45;
-  --text: #e7ecf3;
-  --text-dim: #7b8798;
+  /* Grey scale is the actual "material" now — three distinct steps so
+     panels visibly sit on the case, and buttons visibly sit on panels,
+     instead of everything blending into one near-black value. */
+  --bg: #18181b;
+  --bg-grid: #101012;
+  --panel: #26262b;
+  --panel-raised: #36363d;
+  --panel-sunken: #19191c;
+  --border: #3f3f47;
+  --seam: #55555f;
+  --text: #ebe9e7;
+  --text-dim: #8b8a90;
+  /* Mint stays the ONE bright accent (user-driven state: selection, "on",
+     knob fill). Amber is reserved specifically for agent-driven changes —
+     the reasoning bubbles — so a viewer can tell "who" touched a control
+     at a glance. Don't add a third accent color. */
   --accent: #5eead4;
   --accent-dim: #1d3d3a;
   --accent-strong: #2dd4bf;
@@ -15,6 +23,16 @@
   --bad: #ff6b6b;
   --shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
   --shadow-sm: 0 4px 12px -4px rgba(0, 0, 0, 0.4);
+  /* Tactile button bevels: raised by default, inverted (pressed-in) when
+     active/selected. Shared as variables so every control reads consistently. */
+  --bevel-raised:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.5),
+    0 2px 3px rgba(0, 0, 0, 0.4);
+  --bevel-pressed:
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 1px rgba(255, 255, 255, 0.04),
+    inset 0 3px 6px rgba(0, 0, 0, 0.65);
   --radius: 10px;
   --radius-lg: 16px;
   --radius-sm: 8px;
@@ -36,8 +54,8 @@ body {
   font-family: var(--body);
   background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse 1100px 700px at 50% -12%, rgba(94, 234, 212, 0.055), transparent 60%),
-    radial-gradient(ellipse 1300px 800px at 50% 112%, rgba(0, 0, 0, 0.5), transparent 65%),
+    radial-gradient(ellipse 1100px 700px at 50% -12%, rgba(94, 234, 212, 0.05), transparent 60%),
+    radial-gradient(ellipse 1300px 800px at 50% 112%, rgba(0, 0, 0, 0.55), transparent 65%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
   background-repeat: no-repeat, no-repeat, repeat;
   background-size: cover, cover, 140px 140px;
@@ -162,8 +180,8 @@ body {
 }
 .agent-msg--agent {
   align-self: flex-start;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-strong);
+  background: var(--amber-dim);
+  border: 1px solid var(--amber);
   color: var(--text);
   border-bottom-left-radius: 4px;
 }
@@ -185,13 +203,14 @@ body {
 .agent-form { display: flex; gap: 10px; }
 .agent-form input {
   flex: 1;
-  background: var(--panel-raised);
+  background: var(--panel-sunken);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 999px;
   padding: 12px 18px;
   font-size: 14px;
   font-family: var(--body);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 .agent-form input:focus { outline: none; border-color: var(--accent); }
 .agent-form button {
@@ -203,8 +222,11 @@ body {
   border-radius: 999px;
   padding: 12px 26px;
   cursor: pointer;
-  box-shadow: 0 4px 14px -4px rgba(94, 234, 212, 0.5);
+  box-shadow: 0 4px 14px -4px rgba(94, 234, 212, 0.5), var(--bevel-raised);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
+.agent-form button:hover:not(:disabled) { transform: translateY(-1px); }
+.agent-form button:active:not(:disabled) { transform: translateY(1px); box-shadow: var(--bevel-pressed); }
 .agent-form button:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 
 /* ---------- presets ---------- */
@@ -226,7 +248,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--panel);
+  background: var(--panel-raised);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 999px;
@@ -236,10 +258,11 @@ body {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s, color 0.15s, transform 0.15s;
+  box-shadow: var(--bevel-raised);
+  transition: border-color 0.15s, color 0.15s, transform 0.08s, box-shadow 0.08s;
 }
 .preset-card:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.preset-card:active { transform: translateY(1px); box-shadow: var(--bevel-pressed); }
 .preset-card .badge {
   display: inline-flex;
   align-items: center;
@@ -255,9 +278,9 @@ body {
 
 .surprise-btn {
   margin-left: auto;
-  background: transparent;
-  border: 1px dashed var(--amber);
-  color: var(--amber);
+  background: var(--panel-raised);
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
   border-radius: 999px;
   padding: 8px 16px;
   font-size: 13px;
@@ -265,8 +288,11 @@ body {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: var(--bevel-raised);
+  transition: border-color 0.15s, color 0.15s, transform 0.08s, box-shadow 0.08s;
 }
-.surprise-btn:hover { background: var(--amber-dim); }
+.surprise-btn:hover { border-color: var(--accent); color: var(--accent); }
+.surprise-btn:active { transform: translateY(1px); box-shadow: var(--bevel-pressed); }
 
 /* ---------- the instrument: Envelope/Filter/Delay on top, the 3
    oscillators in the middle, a full-width Output stage on the bottom. ---------- */
@@ -296,8 +322,8 @@ body {
   position: relative;
   min-width: 176px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.35),
     var(--shadow);
 }
 .module::before {
@@ -323,20 +349,20 @@ body {
 /* Power dot: filled = oscillator contributing to the mix, hollow = muted.
    Sits where the old numbered badge used to be. */
 .osc-power {
-  width: 12px; height: 12px;
+  width: 13px; height: 13px;
   flex-shrink: 0;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid var(--text-dim);
-  background: transparent;
+  border: none;
+  background: radial-gradient(circle at 35% 30%, #45454c, var(--panel-sunken) 75%);
+  box-shadow: var(--bevel-raised);
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: background-color 0.15s, box-shadow 0.15s;
 }
-.osc-power:hover { border-color: var(--accent); }
+.osc-power:hover { box-shadow: var(--bevel-raised), 0 0 0 2px var(--border); }
 .osc-power.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 7px rgba(94, 234, 212, 0.7);
+  background: radial-gradient(circle at 35% 30%, var(--accent-strong), var(--accent-dim) 80%);
+  box-shadow: var(--bevel-pressed), 0 0 8px rgba(94, 234, 212, 0.65);
 }
 
 .knob-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
@@ -351,17 +377,37 @@ body {
   cursor: pointer;
   padding: 4px;
   width: 32px; height: 26px;
+  box-shadow: var(--bevel-raised);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, color 0.1s ease, border-color 0.1s ease;
 }
+.wave-mini-btn:hover { color: var(--text); }
+.wave-mini-btn:active { transform: translateY(1px); }
 .wave-mini-btn svg { width: 100%; height: 100%; }
 .wave-mini-btn path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.wave-mini-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.wave-mini-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: var(--bevel-pressed);
+  transform: translateY(1px);
+}
 
-/* ---------- knob ---------- */
+/* ---------- knob: a physical cap (radial-gradient disc) under the value
+   arc, not just a flat circle with a line — catches light off-center like
+   a real turned-metal or molded-plastic knob would. ---------- */
 .knob { display: flex; flex-direction: column; align-items: center; width: 56px; user-select: none; }
-.knob-dial { width: 46px; height: 46px; cursor: ns-resize; touch-action: none; }
+.knob-dial {
+  width: 46px; height: 46px;
+  cursor: ns-resize;
+  touch-action: none;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  transition: filter 0.1s ease;
+}
+.knob-dial.dragging { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) brightness(1.12); }
 .knob-tick { stroke: var(--border); stroke-width: 2; stroke-linecap: round; }
-.knob-track { fill: none; stroke: var(--border); stroke-width: 5; stroke-linecap: round; }
+.knob-track { fill: none; stroke: var(--panel-sunken); stroke-width: 5; stroke-linecap: round; }
 .knob-fill { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
+.knob-cap { stroke: rgba(0, 0, 0, 0.5); stroke-width: 1; }
 .knob-pointer { stroke: var(--text); stroke-width: 2.5; stroke-linecap: round; }
 /* Small caps here is the one deliberate exception — this is silkscreened
    panel text next to a physical-feeling control, not a section heading. */
@@ -375,14 +421,16 @@ body {
 }
 .knob-value { font-family: var(--display); font-size: 12.5px; font-weight: 700; color: var(--text); }
 
-/* ---------- filter / envelope / oscillator visuals: kept quiet and plain
-   on purpose — the Output scope below is the one dramatic element ---------- */
+/* ---------- filter / envelope / oscillator visuals: sunken "glass"
+   screens set into the faceplate — kept quiet and plain on purpose, the
+   Output scope below is the one dramatic element ---------- */
 .filter-curve, .osc-viz {
   width: 100%;
   height: 56px;
   background: var(--bg-grid);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
   display: block;
 }
 .osc-viz { margin-bottom: 12px; }
@@ -392,19 +440,21 @@ body {
   background: var(--bg-grid);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 .envelope-viz polyline.fill { fill: rgba(94, 234, 212, 0.14); stroke: none; }
 .envelope-viz polyline.line { fill: none; stroke: var(--accent); stroke-width: 1.75; }
 
-/* ---------- toggle ---------- */
+/* ---------- toggle: a sunken groove with a raised, gradient-capped thumb ---------- */
 .toggle { position: relative; display: flex; align-items: center; gap: 8px; cursor: pointer; width: fit-content; }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle-track {
   width: 34px; height: 18px;
-  background: var(--panel-raised);
+  background: var(--panel-sunken);
   border: 1px solid var(--border);
   border-radius: 999px;
   position: relative;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5);
   transition: background 0.15s;
 }
 .toggle-track::after {
@@ -412,16 +462,22 @@ body {
   position: absolute;
   top: 1px; left: 1px;
   width: 14px; height: 14px;
-  background: var(--text-dim);
+  background: radial-gradient(circle at 35% 30%, #4a4a52, #2a2a2f 80%);
   border-radius: 50%;
+  box-shadow: var(--bevel-raised);
   transition: transform 0.15s, background 0.15s;
 }
-.toggle input:checked + .toggle-track { border-color: var(--accent); }
-.toggle input:checked + .toggle-track::after { transform: translateX(16px); background: var(--accent); }
+.toggle input:checked + .toggle-track { border-color: var(--accent-dim); }
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(16px);
+  background: radial-gradient(circle at 35% 30%, var(--accent-strong), var(--accent-dim) 85%);
+}
 .toggle-label { font-family: var(--body); font-size: 12px; color: var(--text-dim); }
 
 /* ---------- annotations: a speech bubble "spoken" by the agent, pinned to
-   the module it just changed, tail pointing up at the knobs above it ---------- */
+   the module it just changed, tail pointing up at the knobs above it.
+   Amber here (and nowhere a user directly interacts) is deliberate — it's
+   the one visual tell that a change came from the agent, not a manual turn. ---------- */
 .annotation {
   position: relative;
   min-height: 0;
@@ -436,6 +492,7 @@ body {
   border: 1px solid var(--amber);
   border-radius: 12px;
   padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
 }
 .annotation:not(:empty)::before {
   content: "";
@@ -466,12 +523,12 @@ body {
 .output-scope {
   position: relative;
   width: 100%;
-  background: #050706;
+  background: #0a0a0b;
   border: 1px solid var(--seam);
   border-radius: var(--radius);
   padding: 26px 26px 16px;
   box-shadow:
-    inset 0 2px 10px rgba(0, 0, 0, 0.65),
+    inset 0 2px 10px rgba(0, 0, 0, 0.7),
     0 0 70px -14px rgba(94, 234, 212, 0.18),
     var(--shadow);
   overflow: hidden;
@@ -529,7 +586,7 @@ body {
   font-family: var(--mono);
   font-weight: 600;
   font-size: 11px;
-  color: var(--amber);
+  color: var(--accent);
   margin-left: 10px;
 }
 

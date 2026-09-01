@@ -22,6 +22,41 @@ function clamp(v, min, max) {
   return Math.min(max, Math.max(min, v));
 }
 
+// One shared <defs> block, injected once, so every knob's cap can reference
+// the same gradient by id instead of duplicating an SVG def per knob. The
+// off-center highlight (cx/cy at 35%/30%) is what makes it read as a curved
+// physical cap catching light, rather than a flat painted circle.
+let knobDefsReady = false;
+function ensureKnobDefs() {
+  if (knobDefsReady) return;
+  knobDefsReady = true;
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  const defs = document.createElementNS(svgNS, 'defs');
+  const grad = document.createElementNS(svgNS, 'radialGradient');
+  grad.setAttribute('id', 'knobCapGradient');
+  grad.setAttribute('cx', '35%');
+  grad.setAttribute('cy', '30%');
+  grad.setAttribute('r', '75%');
+  [
+    ['0%', '#6a6a74'],
+    ['35%', '#3d3d44'],
+    ['80%', '#222226'],
+    ['100%', '#151517'],
+  ].forEach(([offset, color]) => {
+    const stop = document.createElementNS(svgNS, 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('stop-color', color);
+    grad.append(stop);
+  });
+  defs.append(grad);
+  svg.append(defs);
+  document.body.append(svg);
+}
+
 /**
  * @param {object} opts
  * @param {string} opts.label
@@ -34,6 +69,7 @@ function clamp(v, min, max) {
  * @param {(real:number)=>void} opts.onChange
  */
 function createKnob(opts) {
+  ensureKnobDefs();
   const {
     label, posMin, posMax, initialPos, step = 0,
     toReal = (p) => p, toPos = (r) => r, format = (v) => String(v), onChange,
@@ -68,12 +104,22 @@ function createKnob(opts) {
   const fill = document.createElementNS(svgNS, 'path');
   fill.setAttribute('class', 'knob-fill');
 
+  // The physical cap — a gradient disc the pointer is drawn on top of, so
+  // the knob reads as a rounded object with a turned indicator, not a flat
+  // ring with a line through the middle.
+  const cap = document.createElementNS(svgNS, 'circle');
+  cap.setAttribute('class', 'knob-cap');
+  cap.setAttribute('cx', cx);
+  cap.setAttribute('cy', cy);
+  cap.setAttribute('r', r - 5);
+  cap.setAttribute('fill', 'url(#knobCapGradient)');
+
   const pointer = document.createElementNS(svgNS, 'line');
   pointer.setAttribute('class', 'knob-pointer');
   pointer.setAttribute('x1', cx);
   pointer.setAttribute('y1', cy);
 
-  svg.append(...ticks, track, fill, pointer);
+  svg.append(...ticks, track, fill, cap, pointer);
 
   const labelEl = document.createElement('div');
   labelEl.className = 'knob-label';
@@ -112,6 +158,7 @@ function createKnob(opts) {
   };
   const onPointerUp = () => {
     dragStartY = null;
+    svg.classList.remove('dragging');
     document.removeEventListener('mousemove', onPointerMove);
     document.removeEventListener('mouseup', onPointerUp);
   };
@@ -119,6 +166,7 @@ function createKnob(opts) {
   svg.addEventListener('mousedown', (e) => {
     dragStartY = e.clientY;
     dragStartPos = pos;
+    svg.classList.add('dragging');
     document.addEventListener('mousemove', onPointerMove);
     document.addEventListener('mouseup', onPointerUp);
     e.preventDefault();
