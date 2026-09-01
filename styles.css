@@ -336,6 +336,11 @@ body {
   gap: 14px;
 }
 .row > .module { flex: 1 1 220px; }
+/* Delay only has a toggle and one knob — let it size to that instead of
+   stretching to match its neighbors, and give the reclaimed width to
+   Envelope, which actually has four knobs and a graph to show. */
+.row-top .module--effect { flex: 0 0 176px; }
+.row-top .module--envelope { flex: 2 1 300px; }
 
 /* Hardware faceplate: tighter corners than a software card, a beveled edge
    (inset highlight + shadow), and a faint seam line near the top — like a
