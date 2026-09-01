@@ -391,7 +391,7 @@ body {
 .knob-value { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--text); }
 
 /* ---------- filter / envelope / scope visuals ---------- */
-.filter-curve, .scope {
+.filter-curve, .scope, .osc-viz {
   width: 100%;
   height: 56px;
   background: var(--bg-grid);
@@ -399,6 +399,7 @@ body {
   border-radius: var(--radius-sm);
   display: block;
 }
+.osc-viz { margin-bottom: 12px; }
 .envelope-viz {
   width: 100%;
   height: 48px;

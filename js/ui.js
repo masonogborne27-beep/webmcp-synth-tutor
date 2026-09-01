@@ -102,11 +102,46 @@ function annotationSlot(param) {
   return box;
 }
 
+// Draws ~2.5 cycles of the given waveform shape, amplitude scaled by level —
+// a muted oscillator (level 0) reads as a flat line, a loud one as a tall wave.
+function drawOscWaveform(canvas, waveform, level) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const cycles = 2.5;
+  const amp = (h / 2 - 5) * Math.max(0, Math.min(1, level));
+  ctx.beginPath();
+  for (let x = 0; x <= w; x++) {
+    const t = (x / w) * cycles * Math.PI * 2;
+    let v;
+    if (waveform === 'sine') v = Math.sin(t);
+    else if (waveform === 'triangle') v = (2 / Math.PI) * Math.asin(Math.sin(t));
+    else if (waveform === 'sawtooth') v = 2 * (((t / (2 * Math.PI)) % 1) - 0.5);
+    else v = Math.sin(t) >= 0 ? 1 : -1; // square
+    const y = h / 2 - v * amp;
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  const style = getComputedStyle(document.documentElement);
+  ctx.strokeStyle = style.getPropertyValue('--accent').trim() || '#5eead4';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
 function buildOscillatorModule(index, engine, onLogged) {
   const module = el('section', 'module module--osc');
   module.append(moduleTitle(`OSC ${index + 1}`, 1));
 
+  const oscState = { waveform: engine.oscillators[index].waveform, level: engine.oscillators[index].level };
+  const canvas = document.createElement('canvas');
+  canvas.width = 220; canvas.height = 56;
+  canvas.className = 'osc-viz';
+  const redrawWave = () => drawOscWaveform(canvas, oscState.waveform, oscState.level);
+  module.append(canvas);
+
   const waveMini = buildWaveformMini(index, engine, () => onLogged(`oscillator-${index}`));
+  waveMini.querySelectorAll('.wave-mini-btn').forEach((btn) => {
+    btn.addEventListener('click', () => { oscState.waveform = btn.dataset.waveform; redrawWave(); });
+  });
   module.append(waveMini);
 
   const levelKnob = createKnob({
@@ -114,7 +149,11 @@ function buildOscillatorModule(index, engine, onLogged) {
     posMin: 0, posMax: 1, step: 0.01,
     initialPos: engine.oscillators[index].level,
     format: (v) => v.toFixed(2),
-    onChange: (v) => { engine.setOscillator(index, { level: v }); onLogged(`oscillator-${index}`); },
+    onChange: (v) => {
+      engine.setOscillator(index, { level: v });
+      oscState.level = v; redrawWave();
+      onLogged(`oscillator-${index}`);
+    },
   });
   const tuneKnob = createKnob({
     label: 'Tune',
@@ -126,13 +165,15 @@ function buildOscillatorModule(index, engine, onLogged) {
 
   module.append(el('div', 'knob-row', [levelKnob.el, tuneKnob.el]));
   module.append(annotationSlot(`oscillator-${index}`));
+  redrawWave();
 
   return {
     module,
     setState({ waveform, level, semitone }) {
-      if (waveform != null) waveMini._setActive(waveform);
-      if (level != null) levelKnob.setReal(level);
+      if (waveform != null) { waveMini._setActive(waveform); oscState.waveform = waveform; }
+      if (level != null) { levelKnob.setReal(level); oscState.level = level; }
       if (semitone != null) tuneKnob.setReal(semitone);
+      redrawWave();
     },
   };
 }
