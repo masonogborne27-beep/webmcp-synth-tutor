@@ -135,63 +135,6 @@ body {
   font-size: 14px;
   color: var(--text);
 }
-.agent-header-controls { display: flex; align-items: center; gap: 8px; }
-.agent-provider-select {
-  background: var(--panel-raised);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 11.5px;
-  font-family: var(--body);
-  cursor: pointer;
-}
-.agent-key-toggle {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 11.5px;
-  font-family: var(--body);
-  cursor: pointer;
-}
-.agent-key-toggle--set { border-color: var(--accent-dim); color: var(--accent); }
-
-.agent-key-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  background: var(--panel-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  margin-bottom: 12px;
-}
-.agent-key-row[hidden] { display: none; }
-.agent-key-row input[type="password"] {
-  flex: 1 1 220px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-family: var(--mono);
-  font-size: 12px;
-}
-.agent-key-row button {
-  background: var(--accent-dim);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.agent-key-row a { color: var(--accent); font-size: 12px; }
-.agent-key-hint { flex-basis: 100%; font-size: 11px; color: var(--text-dim); }
 
 .agent-log {
   display: flex;

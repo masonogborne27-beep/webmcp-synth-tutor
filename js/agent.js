@@ -4,14 +4,15 @@
 // follow-ups. Works for anyone, not just visitors using an agentic browser
 // that supports WebMCP.
 //
-// Default experience needs zero setup: "Shared" routes through a tiny
-// Cloudflare Worker (../worker/index.js) holding one Anthropic key as a
-// server-side secret, so a visitor never sees or needs an API key. Gemini
-// and Claude "bring your own key" options remain available as a fallback
-// (e.g. if the shared backend is rate-limited, or someone wants to use their
-// own account) — same tool defs, same execute() functions, either way.
+// Default (and only, in the UI) experience needs zero setup: "Shared" routes
+// through a tiny Cloudflare Worker (../worker/index.js) holding one
+// Anthropic key as a server-side secret, so a visitor never sees or needs an
+// API key. The Gemini/Claude "bring your own key" provider objects below
+// still exist in code — same tool defs, same execute() functions — but the
+// dropdown/key-entry UI that let a visitor pick them was removed as demo
+// clutter; getStoredApiKey() is what Agent.send() would use for either if
+// something ever wires them back up.
 
-const AGENT_PROVIDER_STORAGE = 'signal_path_agent_provider';
 const AGENT_KEY_STORAGE_PREFIX = 'signal_path_api_key_';
 const AGENT_MODEL_CACHE_PREFIX = 'signal_path_model_';
 
@@ -20,16 +21,6 @@ const SHARED_WORKER_URL = 'https://signal-path-agent-proxy.mason-mcp-synth.worke
 
 function getStoredApiKey(provider) {
   return localStorage.getItem(AGENT_KEY_STORAGE_PREFIX + provider) || '';
-}
-function setStoredApiKey(provider, key) {
-  if (key) localStorage.setItem(AGENT_KEY_STORAGE_PREFIX + provider, key);
-  else localStorage.removeItem(AGENT_KEY_STORAGE_PREFIX + provider);
-}
-function getStoredProvider() {
-  return localStorage.getItem(AGENT_PROVIDER_STORAGE) || 'shared';
-}
-function setStoredProvider(provider) {
-  localStorage.setItem(AGENT_PROVIDER_STORAGE, provider);
 }
 
 const SYSTEM_TEXT =
@@ -371,75 +362,24 @@ function makeDraggable(panel, handle) {
   });
 }
 
+// The provider abstraction (Shared/Gemini/Claude) still exists above for
+// anyone reading the code, but the UI only ever drives Shared now — the
+// dropdown and key-entry controls were cut as demo clutter once the shared
+// backend made them unnecessary for the default experience.
 function initAgentPanel(toolDefs) {
   makeDraggable(document.querySelector('.agent-panel'), document.querySelector('.agent-header'));
 
-  const providerSelect = document.getElementById('agent-provider-select');
-  const keyToggle = document.getElementById('agent-key-toggle');
-  const keyRow = document.getElementById('agent-key-row');
-  const keyInput = document.getElementById('agent-key-input');
-  const keySave = document.getElementById('agent-key-save');
-  const keyLink = document.getElementById('agent-key-link');
   const form = document.getElementById('agent-form');
   const input = document.getElementById('agent-input');
   const sendBtn = document.getElementById('agent-send');
 
-  let currentProvider = PROVIDERS[getStoredProvider()] || PROVIDERS.shared;
-  providerSelect.value = currentProvider.id;
-  const agent = new Agent(toolDefs, currentProvider);
-
-  const refreshForProvider = () => {
-    if (!currentProvider.needsKey) {
-      keyToggle.hidden = true;
-      keyRow.hidden = true;
-      return;
-    }
-    keyToggle.hidden = false;
-    const has = !!getStoredApiKey(currentProvider.id);
-    keyToggle.textContent = has ? `⚙ ${currentProvider.label} key ✓` : `⚙ ${currentProvider.label} key needed`;
-    keyToggle.classList.toggle('agent-key-toggle--set', has);
-    keyInput.placeholder = currentProvider.keyPlaceholder;
-    keyLink.href = currentProvider.getKeyUrl;
-  };
-  refreshForProvider();
-
-  providerSelect.addEventListener('change', () => {
-    currentProvider = PROVIDERS[providerSelect.value];
-    setStoredProvider(currentProvider.id);
-    agent.setProvider(currentProvider);
-    keyRow.hidden = true;
-    refreshForProvider();
-    appendChatMessage('status', `Switched to ${currentProvider.label}. Conversation history reset.`);
-  });
-
-  keyToggle.addEventListener('click', () => {
-    keyRow.hidden = !keyRow.hidden;
-    if (!keyRow.hidden) keyInput.focus();
-  });
-
-  keySave.addEventListener('click', () => {
-    const value = keyInput.value.trim();
-    if (!value) return;
-    setStoredApiKey(currentProvider.id, value);
-    sessionStorage.removeItem(AGENT_MODEL_CACHE_PREFIX + currentProvider.id);
-    keyInput.value = '';
-    keyRow.hidden = true;
-    refreshForProvider();
-    appendChatMessage('status', `${currentProvider.label} API key saved to this browser. Try asking for a sound.`);
-  });
+  const agent = new Agent(toolDefs, PROVIDERS.shared);
 
   let busy = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text || busy) return;
-
-    if (currentProvider.needsKey && !getStoredApiKey(currentProvider.id)) {
-      appendChatMessage('status', `Add a ${currentProvider.label} API key first (⚙ above).`);
-      keyRow.hidden = false;
-      keyInput.focus();
-      return;
-    }
 
     appendChatMessage('user', text);
     input.value = '';
@@ -455,11 +395,7 @@ function initAgentPanel(toolDefs) {
       appendChatMessage('agent', reply);
     } catch (err) {
       statusMsg.remove();
-      if (err.code === 'NO_KEY') {
-        appendChatMessage('status', `Add a ${currentProvider.label} API key first (⚙ above).`);
-      } else {
-        appendChatMessage('error', err.message || 'Something went wrong talking to the agent.');
-      }
+      appendChatMessage('error', err.message || 'Something went wrong talking to the agent.');
     } finally {
       busy = false;
       sendBtn.disabled = false;
