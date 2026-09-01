@@ -67,10 +67,6 @@ function moduleTitle(text) {
   return el('h3', 'module-title', [text]);
 }
 
-function chainArrow() {
-  return el('div', 'chain-arrow', ['→']);
-}
-
 // ---- log-scale helpers for the filter cutoff knob ----
 function sliderToHz(v) {
   const minLog = Math.log(20), maxLog = Math.log(20000);
@@ -427,7 +423,8 @@ function buildOutputModule(engine) {
 }
 
 function buildSignalPath(engine, onLogged) {
-  const chain = document.getElementById('chain');
+  const rowTop = document.getElementById('row-top');
+  const rowOsc = document.getElementById('row-osc');
   const outputHero = document.getElementById('output-hero');
 
   const oscUIs = [0, 1, 2].map((i) => buildOscillatorModule(i, engine, onLogged));
@@ -436,15 +433,8 @@ function buildSignalPath(engine, onLogged) {
   const effectUI = buildEffectModule(engine, onLogged);
   const outputUI = buildOutputModule(engine);
 
-  const oscGroup = el('div', 'chain-group');
-  oscUIs.forEach((o) => oscGroup.append(o.module));
-
-  chain.append(
-    oscGroup, chainArrow(),
-    filterUI.module, chainArrow(),
-    envelopeUI.module, chainArrow(),
-    effectUI.module
-  );
+  rowTop.append(envelopeUI.module, filterUI.module, effectUI.module);
+  oscUIs.forEach((o) => rowOsc.append(o.module));
   outputHero.append(outputUI.module);
 
   return { oscUIs, filterUI, envelopeUI, effectUI, outputUI };

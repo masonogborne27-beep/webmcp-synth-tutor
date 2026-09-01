@@ -58,19 +58,20 @@
   </section>
 
   <main class="instrument">
-    <div class="chain" id="chain">
-      <!-- OSC 1-3 (grouped, parallel) -> Filter -> Envelope -> Delay, connected
-           by arrows so the layout itself shows the signal path -->
+    <div class="row row-top" id="row-top">
+      <!-- Envelope, Filter, Delay -->
+    </div>
+    <div class="row row-osc" id="row-osc">
+      <!-- OSC 1, 2, 3 -->
     </div>
     <section class="output-hero" id="output-hero">
-      <!-- Output: the one bold/dramatic element on the page -->
+      <!-- Output: the one bold/dramatic element on the page, full width -->
     </section>
   </main>
 
   <section class="keyboard-panel">
     <h2>
       Keyboard
-      <span class="hint">(click any key, or type A S D F G H J K / W E T Y U — Z/X shifts octave)</span>
       <span id="octave-indicator" class="octave-indicator"></span>
     </h2>
     <div id="keyboard-scroll" class="keyboard-scroll">
