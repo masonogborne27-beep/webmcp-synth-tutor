@@ -211,10 +211,12 @@ function drawEnvelopeViz(svg, env) {
   const sustainEnd = x2 + holdFrac * w;
   const x3 = Math.min(sustainEnd + (env.release / totalTime) * w, w);
   const sustainY = floor - env.sustain * (floor - 2);
-  const points = [
+  const linePoints = [
     [0, floor], [x1, 2], [x2, sustainY], [Math.min(sustainEnd, w - 1), sustainY], [x3, floor],
-  ].map((p) => p.join(',')).join(' ');
-  svg.querySelector('polyline').setAttribute('points', points);
+  ];
+  const fillPoints = [...linePoints, [x3, floor + 2], [0, floor + 2]];
+  svg.querySelector('polyline.line').setAttribute('points', linePoints.map((p) => p.join(',')).join(' '));
+  svg.querySelector('polyline.fill').setAttribute('points', fillPoints.map((p) => p.join(',')).join(' '));
 }
 
 function buildEnvelopeModule(engine, onLogged) {
@@ -222,7 +224,8 @@ function buildEnvelopeModule(engine, onLogged) {
   module.append(el('h3', 'module-title', ['Envelope']));
 
   const svg = svgEl('svg', { viewBox: '0 0 120 48', class: 'envelope-viz' });
-  svg.append(svgEl('polyline', { points: '0,46 0,46' }));
+  svg.append(svgEl('polyline', { class: 'fill', points: '0,46 0,46' }));
+  svg.append(svgEl('polyline', { class: 'line', points: '0,46 0,46' }));
   module.append(svg);
 
   const state = { ...engine.envelope };
@@ -355,14 +358,21 @@ function initKeyboard(engine) {
   const container = document.getElementById('keyboard');
   const keyEls = {};
 
-  WHITE_KEYS.forEach((note) => {
-    const keyEl = el('div', 'key white', [note]);
+  const makeKey = (className, note) => {
+    const qwertyEl = el('span', 'key-qwerty', ['']);
+    const keyEl = el('div', className, [note, qwertyEl]);
     keyEl.dataset.note = note;
+    keyEl._qwertyEl = qwertyEl;
+    return keyEl;
+  };
+
+  WHITE_KEYS.forEach((note) => {
+    const keyEl = makeKey('key white', note);
     container.appendChild(keyEl);
     keyEls[note] = keyEl;
   });
   BLACK_KEYS.forEach(({ note, afterWhiteIndex }) => {
-    const keyEl = el('div', 'key black');
+    const keyEl = makeKey('key black', '');
     keyEl.dataset.note = note;
     keyEl.style.position = 'absolute';
     keyEl.style.left = `${(afterWhiteIndex + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2}px`;
@@ -399,7 +409,18 @@ function initKeyboard(engine) {
 
   let currentOctave = DEFAULT_OCTAVE;
   const octaveIndicator = document.getElementById('octave-indicator');
-  const renderOctave = () => { octaveIndicator.textContent = `Octave ${currentOctave} (Z/X to shift)`; };
+  const updateQwertyLabels = () => {
+    Object.values(keyEls).forEach((k) => { k._qwertyEl.textContent = ''; });
+    Object.entries(KEY_TO_SEMITONE).forEach(([letter, semitone]) => {
+      const note = qwertyNoteName(semitone, currentOctave);
+      const keyEl = keyEls[note];
+      if (keyEl) keyEl._qwertyEl.textContent = letter.toUpperCase();
+    });
+  };
+  const renderOctave = () => {
+    octaveIndicator.textContent = `Octave ${currentOctave} (Z/X to shift)`;
+    updateQwertyLabels();
+  };
   renderOctave();
 
   // Never hijack keystrokes meant for a text field (agent chat, API key input, etc).
@@ -458,8 +479,8 @@ function randomPreset() {
 
 function initPresets(engine, uiHandles) {
   const container = document.getElementById('presets');
-  PRESETS.forEach((preset) => {
-    const card = el('button', 'preset-card', [preset.name]);
+  PRESETS.forEach((preset, i) => {
+    const card = el('button', 'preset-card', [el('span', 'badge', [String(i + 1)]), preset.name]);
     card.addEventListener('click', () => {
       engine.loadPreset(preset);
       applyPresetToUI(preset, uiHandles);

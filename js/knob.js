@@ -51,6 +51,16 @@ function createKnob(opts) {
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
   svg.setAttribute('class', 'knob-dial');
 
+  const ticks = [KNOB_MIN_ANGLE, 0, KNOB_MAX_ANGLE].map((angle) => {
+    const inner = polarToCartesian(cx, cy, r + 4, angle);
+    const outer = polarToCartesian(cx, cy, r + 7, angle);
+    const tick = document.createElementNS(svgNS, 'line');
+    tick.setAttribute('class', 'knob-tick');
+    tick.setAttribute('x1', inner.x); tick.setAttribute('y1', inner.y);
+    tick.setAttribute('x2', outer.x); tick.setAttribute('y2', outer.y);
+    return tick;
+  });
+
   const track = document.createElementNS(svgNS, 'path');
   track.setAttribute('class', 'knob-track');
   track.setAttribute('d', describeArc(cx, cy, r, KNOB_MIN_ANGLE, KNOB_MAX_ANGLE));
@@ -63,7 +73,7 @@ function createKnob(opts) {
   pointer.setAttribute('x1', cx);
   pointer.setAttribute('y1', cy);
 
-  svg.append(track, fill, pointer);
+  svg.append(...ticks, track, fill, pointer);
 
   const labelEl = document.createElement('div');
   labelEl.className = 'knob-label';
