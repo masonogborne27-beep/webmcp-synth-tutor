@@ -47,8 +47,19 @@ const REASON_FIELD = {
 // Returns the tool definitions as plain data + execute functions, independent
 // of WebMCP. Both registerWebMcpTools() and the Agent panel consume this.
 function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
-  const withReason = (parameter, reason) => {
-    if (reason) addReasoningLogEntry(parameter, reason);
+  // "applied" is always read back from live engine state AFTER the change is
+  // made — never from the LLM's own args — so the number shown next to the
+  // model's prose explanation is provably the same value that was actually
+  // set, not a second, independently-generated value that can drift from it.
+  const withReason = (parameter, reason, applied) => {
+    if (reason) addReasoningLogEntry(parameter, reason, applied);
+  };
+
+  // Every tool call is logged with its raw args exactly as the LLM sent them,
+  // so a mismatch between what the model *said* and what it *sent* is
+  // verifiable from devtools rather than taken on faith.
+  const logCall = (name, args, applied) => {
+    console.debug(`[tool call] ${name}`, { args, applied });
   };
 
   return [
@@ -83,8 +94,11 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         const index = oscillator - 1;
         engine.setOscillator(index, { waveform, level, detune, semitone });
         oscUIs[index].setState({ waveform, level, semitone });
-        withReason(`oscillator-${index}`, reason);
-        return `Oscillator ${oscillator} updated.`;
+        const o = engine.oscillators[index];
+        const applied = `${o.waveform}, level ${o.level.toFixed(2)}, tune ${o.semitone >= 0 ? '+' : ''}${o.semitone} st, detune ${o.detune}¢`;
+        withReason(`oscillator-${index}`, reason, applied);
+        logCall('set_oscillator', { oscillator, waveform, level, detune, semitone, reason }, applied);
+        return `Oscillator ${oscillator} is now: ${applied}.`;
       },
     },
     {
@@ -109,11 +123,10 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ cutoff, resonance, reason }) => {
         engine.setFilter({ cutoff, resonance });
         filterUI.setState({ cutoff, resonance });
-        withReason('filter', reason);
-        const parts = [];
-        if (cutoff != null) parts.push(`cutoff to ${Math.round(cutoff)} Hz`);
-        if (resonance != null) parts.push(`resonance to ${resonance.toFixed(1)}`);
-        return `Set ${parts.join(' and ')}.`;
+        const applied = `cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}`;
+        withReason('filter', reason, applied);
+        logCall('set_filter', { cutoff, resonance, reason }, applied);
+        return `Filter is now: ${applied}.`;
       },
     },
     {
@@ -140,8 +153,11 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ attack, decay, sustain, release, reason }) => {
         engine.setEnvelope({ attack, decay, sustain, release });
         envelopeUI.setState({ attack, decay, sustain, release });
-        withReason('envelope', reason);
-        return 'Envelope updated.';
+        const e = engine.envelope;
+        const applied = `attack ${e.attack.toFixed(2)}s, decay ${e.decay.toFixed(2)}s, sustain ${e.sustain.toFixed(2)}, release ${e.release.toFixed(2)}s`;
+        withReason('envelope', reason, applied);
+        logCall('set_envelope', { attack, decay, sustain, release, reason }, applied);
+        return `Envelope is now: ${applied}.`;
       },
     },
     {
@@ -164,8 +180,10 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ enabled, mix, reason }) => {
         engine.setEffect({ enabled, mix });
         effectUI.setState({ enabled, mix });
-        withReason('effect', reason);
-        return `Delay ${enabled ? 'enabled' : 'disabled'}${mix != null ? ` at mix ${mix.toFixed(2)}` : ''}.`;
+        const applied = `${engine.effect.enabled ? 'on' : 'off'}, mix ${engine.effect.mix.toFixed(2)}`;
+        withReason('effect', reason, applied);
+        logCall('set_effect', { enabled, mix, reason }, applied);
+        return `Delay is now: ${applied}.`;
       },
     },
     {
@@ -190,8 +208,10 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         if (!preset) return `Unknown preset: ${presetId}`;
         engine.loadPreset(preset);
         applyPresetToUI(preset, { oscUIs, filterUI, envelopeUI, effectUI });
-        withReason('preset', reason || `Loaded the "${preset.name}" preset as a starting point.`);
-        return `Loaded preset "${preset.name}".`;
+        const applied = `"${preset.name}" — cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}, delay ${engine.effect.enabled ? 'on' : 'off'}`;
+        withReason('preset', reason || `Loaded the "${preset.name}" preset as a starting point.`, applied);
+        logCall('load_preset', { preset: presetId, reason }, applied);
+        return `Loaded preset ${applied}.`;
       },
     },
     {

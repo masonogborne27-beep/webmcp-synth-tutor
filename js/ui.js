@@ -549,19 +549,27 @@ const PARAM_LABELS = {
   filter: 'filter', envelope: 'envelope', effect: 'delay', preset: 'preset',
 };
 
-function addReasoningLogEntry(parameter, reason) {
+// `applied` is a deterministic summary read back from live engine state — see
+// webmcp-tools.js — always shown alongside the model's own `reason` prose so
+// a viewer can catch it directly if the two ever disagree, rather than
+// silently trusting the model's explanation as ground truth.
+function addReasoningLogEntry(parameter, reason, applied) {
   if (!reason) return;
   const list = document.getElementById('reasoning-log-list');
   const li = document.createElement('li');
   const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const label = PARAM_LABELS[parameter] || parameter;
-  li.innerHTML = `<span class="param">${label}</span>${reason}<span class="time">${time}</span>`;
+  li.append(el('span', 'param', [label]), document.createTextNode(reason));
+  if (applied) li.append(el('span', 'applied', [` (set: ${applied})`]));
+  li.append(el('span', 'time', [time]));
   list.prepend(li);
   while (list.children.length > MAX_LOG_ENTRIES) list.removeChild(list.lastChild);
 
   const inline = document.getElementById(`reason-${parameter}`);
   if (inline) {
-    inline.textContent = reason;
+    inline.textContent = '';
+    inline.append(document.createTextNode(reason));
+    if (applied) inline.append(el('span', 'applied', [` (set: ${applied})`]));
     inline.classList.remove('annotation--flash');
     void inline.offsetWidth;
     inline.classList.add('annotation--flash');

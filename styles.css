@@ -489,6 +489,11 @@ body {
   font-size: 11px;
 }
 #reasoning-log-list li .time { color: var(--text-dim); font-size: 11px; margin-left: 6px; font-family: var(--mono); }
+#reasoning-log-list li .applied, .annotation .applied {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+}
 
 /* ---------- keyboard ---------- */
 .keyboard-panel { padding: 4px 24px 28px; }

@@ -38,10 +38,15 @@ const SYSTEM_TEXT =
   'tool calls using the mappings described in each tool\'s own description. For a broad or ' +
   'vague request, prefer calling load_preset first to get close quickly, then fine-tune with ' +
   'the other tools only if useful. For every tool call that changes a parameter, always ' +
-  'include a short, plain-language "reason" written for a beginner. After you are done making ' +
-  'changes, you must always send a short, warm, non-technical final reply summarizing what you ' +
-  'changed and why (1-3 sentences) — this is shown directly to the user as chat, so never stop ' +
-  'after only calling functions with no reply text. If the user asks a pure question with no ' +
+  'include a short, plain-language "reason" written for a beginner, and that reason must ' +
+  'describe the exact numeric values you are passing in that same call — never mention a ' +
+  'different number than the one in the call\'s own arguments. After you are done making ' +
+  'changes, each function result tells you the real, final value of every parameter it ' +
+  'touched — you must always send a short, warm, non-technical final reply summarizing what ' +
+  'changed (1-3 sentences), and that reply must stay strictly consistent with those returned ' +
+  'values (e.g. if a result says "resonance 2.0", do not describe it as heavily resonant or ' +
+  'give a different number) — never stop after only calling functions with no reply text, and ' +
+  'never describe a value you did not actually set. If the user asks a pure question with no ' +
   'change to make, use explain_parameter and relay its answer conversationally.';
 
 // ---- Shared provider (default, no key needed) ----
@@ -298,6 +303,7 @@ class Agent {
         } catch (err) {
           resultText = `Error running ${call.name}: ${err.message}`;
         }
+        console.debug(`[agent:${provider.id}] ${call.name}`, { rawArgs: call.args, resultText });
         resultsByCall.push({ ...call, resultText });
       }
       provider.appendFunctionResults(this.history, resultsByCall);
