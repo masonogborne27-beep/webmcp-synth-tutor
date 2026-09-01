@@ -1,0 +1,254 @@
+:root {
+  --bg: #14151a;
+  --panel: #1d1f26;
+  --border: #2c2f3a;
+  --text: #e8e9ee;
+  --text-dim: #9599a6;
+  --accent: #7c9cff;
+  --accent-dim: #3d4a7a;
+  --good: #5fd97a;
+  --bad: #ff6b6b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.mcp-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.mcp-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bad);
+}
+
+.mcp-status--on .dot { background: var(--good); }
+.mcp-status--on { color: var(--good); border-color: var(--good); }
+
+.layout {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.reasoning-log {
+  grid-column: span 4;
+}
+
+@media (min-width: 1100px) {
+  .reasoning-log { grid-column: span 4; }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.effect-name { text-transform: none; letter-spacing: 0; }
+
+.waveform-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.wave-btn {
+  background: #14151a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.wave-btn svg { width: 40px; height: 24px; }
+.wave-btn path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.wave-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.control-row label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dim);
+}
+
+.value { color: var(--text); font-variant-numeric: tabular-nums; }
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.envelope-viz {
+  width: 100%;
+  height: 50px;
+  margin: 4px 0 8px;
+}
+
+.envelope-viz polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.reason {
+  min-height: 32px;
+  font-size: 12px;
+  color: var(--accent);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.reasoning-log .hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+
+#reasoning-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#reasoning-log-list li {
+  font-size: 13px;
+  border-left: 2px solid var(--accent-dim);
+  padding: 4px 10px;
+}
+
+#reasoning-log-list li .param {
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+#reasoning-log-list li .time {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.keyboard-panel {
+  padding: 0 24px 28px;
+}
+
+.keyboard-panel h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.keyboard-panel .hint {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.keyboard {
+  position: relative;
+  display: flex;
+  height: 160px;
+  user-select: none;
+}
+
+.key {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+  font-size: 11px;
+}
+
+.key.white {
+  background: #f2f3f7;
+  color: #333;
+  width: 60px;
+  height: 100%;
+  z-index: 1;
+}
+
+.key.white.active { background: var(--accent); }
+
+.key.black {
+  background: #0c0d10;
+  color: #ccc;
+  width: 38px;
+  height: 62%;
+  margin: 0 -19px;
+  z-index: 2;
+}
+
+.key.black.active { background: var(--accent-dim); }
