@@ -402,8 +402,13 @@ function initKeyboard(engine) {
   const renderOctave = () => { octaveIndicator.textContent = `Octave ${currentOctave} (Z/X to shift)`; };
   renderOctave();
 
+  // Never hijack keystrokes meant for a text field (agent chat, API key input, etc).
+  const isTypingTarget = (e) =>
+    ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable;
+
   const heldKeys = new Map(); // physical key -> note name, so keyup releases the right note even after a shift
   document.addEventListener('keydown', (e) => {
+    if (isTypingTarget(e)) return;
     const key = e.key.toLowerCase();
     if (key === 'z') { currentOctave = Math.max(MIN_OCTAVE, currentOctave - 1); renderOctave(); return; }
     if (key === 'x') { currentOctave = Math.min(MAX_OCTAVE, currentOctave + 1); renderOctave(); return; }
@@ -413,6 +418,8 @@ function initKeyboard(engine) {
     press(note);
   });
   document.addEventListener('keyup', (e) => {
+    // Always release a key we're tracking, even if focus moved to a text
+    // field mid-hold — otherwise the note gets stuck on.
     const key = e.key.toLowerCase();
     const note = heldKeys.get(key);
     heldKeys.delete(key);
