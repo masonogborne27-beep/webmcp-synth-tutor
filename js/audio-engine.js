@@ -1,11 +1,16 @@
 // Core Web Audio synth engine. No DOM references here — pure audio logic
 // so both the UI and the WebMCP tools can drive the same functions.
 
-const NOTE_FREQS = {
-  C4: 261.63, 'C#4': 277.18, D4: 293.66, 'D#4': 311.13, E4: 329.63,
-  F4: 349.23, 'F#4': 369.99, G4: 392.00, 'G#4': 415.30, A4: 440.00,
-  'A#4': 466.16, B4: 493.88, C5: 523.25,
-};
+// Equal-temperament frequency table, generated rather than hand-typed so the
+// keyboard can span multiple octaves (A4 = 440Hz, MIDI note 69).
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOTE_FREQS = {};
+for (let octave = 0; octave <= 7; octave++) {
+  NOTE_NAMES.forEach((name, i) => {
+    const midi = (octave + 1) * 12 + i;
+    NOTE_FREQS[`${name}${octave}`] = 440 * Math.pow(2, (midi - 69) / 12);
+  });
+}
 
 const DEFAULT_OSCILLATORS = [
   { waveform: 'sawtooth', level: 1, detune: 0, semitone: 0 },

@@ -303,8 +303,16 @@ body {
   color: var(--text-dim);
 }
 .keyboard-panel .hint { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; }
+.octave-indicator {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--amber);
+  margin-left: 10px;
+}
 
-.keyboard { position: relative; display: flex; height: 130px; user-select: none; }
+.keyboard-scroll { overflow-x: auto; padding-bottom: 4px; }
+.keyboard { position: relative; display: flex; height: 130px; user-select: none; width: max-content; }
 .key {
   position: relative;
   border: 1px solid var(--border);
@@ -314,10 +322,10 @@ body {
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 8px;
-  font-size: 10px;
+  font-size: 9px;
   font-family: var(--mono);
 }
-.key.white { background: #e9f7ee; color: #1a2a1e; width: 44px; height: 100%; z-index: 1; }
+.key.white { background: #e9f7ee; color: #1a2a1e; width: 34px; height: 100%; z-index: 1; }
 .key.white.active { background: var(--accent); }
-.key.black { background: #060906; color: #9fd; width: 28px; height: 62%; margin: 0 -14px; z-index: 2; }
+.key.black { background: #060906; color: #9fd; width: 22px; height: 62%; margin: 0 -11px; z-index: 2; }
 .key.black.active { background: var(--accent-dim); }

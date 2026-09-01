@@ -2,20 +2,40 @@
 // keyboard, presets, reasoning log/annotations, status pill. Pure UI logic —
 // talks to a SynthEngine instance passed in, never creates one.
 
-const WHITE_KEYS = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
-const BLACK_KEYS = [
-  { note: 'C#4', afterWhiteIndex: 0 },
-  { note: 'D#4', afterWhiteIndex: 1 },
-  { note: 'F#4', afterWhiteIndex: 3 },
-  { note: 'G#4', afterWhiteIndex: 4 },
-  { note: 'A#4', afterWhiteIndex: 5 },
-];
-const KEY_TO_NOTE = {
-  a: 'C4', w: 'C#4', s: 'D4', e: 'D#4', d: 'E4', f: 'F4',
-  t: 'F#4', g: 'G4', y: 'G#4', h: 'A4', u: 'A#4', j: 'B4', k: 'C5',
+// Full playable range, not just one octave — a real MIDI controller's worth
+// (C2-C6, 4 octaves) so an average user can actually play a bassline and a
+// lead without feeling boxed in.
+const KEYBOARD_OCTAVES = [2, 3, 4, 5];
+const WHITE_NOTE_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const BLACK_AFTER_NAMES = ['C', 'D', 'F', 'G', 'A'];
+
+const WHITE_KEYS = KEYBOARD_OCTAVES.flatMap((oct) => WHITE_NOTE_NAMES.map((n) => `${n}${oct}`));
+WHITE_KEYS.push(`C${KEYBOARD_OCTAVES[KEYBOARD_OCTAVES.length - 1] + 1}`);
+const BLACK_KEYS = KEYBOARD_OCTAVES.flatMap((oct) =>
+  BLACK_AFTER_NAMES.map((n) => ({
+    note: `${n}#${oct}`,
+    afterWhiteIndex: WHITE_KEYS.indexOf(`${n}${oct}`),
+  }))
+);
+
+// QWERTY plays one octave at a time, relative to a shiftable "current octave"
+// (Z/X shift it) — semitone offsets from that octave's C.
+const KEY_TO_SEMITONE = {
+  a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12,
 };
-const WHITE_KEY_WIDTH = 44;
-const BLACK_KEY_WIDTH = 28;
+const DEFAULT_OCTAVE = 4;
+const MIN_OCTAVE = 1;
+const MAX_OCTAVE = 6;
+
+function qwertyNoteName(semitoneOffset, octave) {
+  const midi = (octave + 1) * 12 + semitoneOffset;
+  const name = NOTE_NAMES[((midi % 12) + 12) % 12];
+  const noteOctave = Math.floor(midi / 12) - 1;
+  return `${name}${noteOctave}`;
+}
+
+const WHITE_KEY_WIDTH = 34;
+const BLACK_KEY_WIDTH = 22;
 
 const WAVE_PATHS = {
   sine: 'M2 12 C 5 3, 8 3, 12 12 S 19 21, 22 12',
@@ -377,16 +397,25 @@ function initKeyboard(engine) {
     if (note && mouseIsDown) release(note);
   });
 
-  const heldKeys = new Set();
+  let currentOctave = DEFAULT_OCTAVE;
+  const octaveIndicator = document.getElementById('octave-indicator');
+  const renderOctave = () => { octaveIndicator.textContent = `Octave ${currentOctave} (Z/X to shift)`; };
+  renderOctave();
+
+  const heldKeys = new Map(); // physical key -> note name, so keyup releases the right note even after a shift
   document.addEventListener('keydown', (e) => {
-    const note = KEY_TO_NOTE[e.key.toLowerCase()];
-    if (!note || heldKeys.has(e.key)) return;
-    heldKeys.add(e.key);
+    const key = e.key.toLowerCase();
+    if (key === 'z') { currentOctave = Math.max(MIN_OCTAVE, currentOctave - 1); renderOctave(); return; }
+    if (key === 'x') { currentOctave = Math.min(MAX_OCTAVE, currentOctave + 1); renderOctave(); return; }
+    if (!(key in KEY_TO_SEMITONE) || heldKeys.has(key)) return;
+    const note = qwertyNoteName(KEY_TO_SEMITONE[key], currentOctave);
+    heldKeys.set(key, note);
     press(note);
   });
   document.addEventListener('keyup', (e) => {
-    const note = KEY_TO_NOTE[e.key.toLowerCase()];
-    heldKeys.delete(e.key);
+    const key = e.key.toLowerCase();
+    const note = heldKeys.get(key);
+    heldKeys.delete(key);
     if (note) release(note);
   });
 }
