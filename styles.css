@@ -442,8 +442,28 @@ body {
    e.g. with devtools docked open), which is what actually produced
    "misaligned top edges": Delay wasn't misaligned, it was on a different
    row entirely. nowrap makes that structurally impossible; only a viewport
-   narrower than the three panels' hard floor can still overflow. */
-.row-top { flex-wrap: nowrap; }
+   narrower than the three panels' hard floor can still overflow.
+   stretch (overriding .row's flex-start) makes Filter's and Delay's outline
+   match Envelope's height exactly, since Envelope is the tallest of the
+   three by content. Delay's own internal layout is deliberately left
+   untouched — the extra height just becomes blank space below its knob. */
+.row-top { flex-wrap: nowrap; align-items: stretch; }
+
+/* Filter's box now stretches taller than its own content (see .row-top
+   above). Becoming a flex column lets that leftover height be handed to
+   the knob row via margin-top:auto instead of sitting unused above it —
+   pushing Cutoff/Resonance down to the bottom of the faceplate, left-
+   aligned rather than centered, echoing where a hardware panel would
+   actually mount them relative to the graph above. */
+.module--filter { display: flex; flex-direction: column; }
+.module--filter .knob-row { justify-content: flex-start; margin-top: auto; }
+
+/* Oscillator knobs get the same left-anchored treatment (undoing the
+   centering applied for consistency with Filter's row, per direct
+   instruction) — Delay's single knob keeps the centered treatment from
+   before, since Delay's layout is explicitly not being touched here. */
+.module--osc { display: flex; flex-direction: column; }
+.module--osc .knob-row { justify-content: flex-start; margin-top: auto; }
 
 /* Hardware faceplate: tighter corners than a software card, a beveled edge
    (inset highlight + shadow), and a faint seam line near the top — like a
