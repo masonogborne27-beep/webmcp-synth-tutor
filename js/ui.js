@@ -862,7 +862,12 @@ function initPresets(engine, uiHandles) {
     const preset = randomPreset();
     engine.loadPreset(preset);
     applyPresetToUI(preset, uiHandles);
-    annotatePresetLoad('Randomized every parameter — see what stuck and refine from here.');
+    // No bubbles here on purpose: a named preset has a real story worth
+    // telling ("Loaded Warm Pad..."), but a random patch's values are
+    // arbitrary — six bubbles of "(now: cutoff 6529 Hz...)" don't teach
+    // anything, they're just noise. Clear whatever bubbles were already up
+    // so nothing stale lingers over the new random values.
+    clearAllAnnotations();
   });
 }
 
