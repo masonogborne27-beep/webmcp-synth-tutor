@@ -403,7 +403,7 @@ body {
   margin-left: auto;
   background: var(--panel-raised);
   border: 1px dashed var(--border);
-  color: var(--text-dim);
+  color: var(--text);
   border-radius: 999px;
   padding: 8px 16px;
   font-size: 13px;
