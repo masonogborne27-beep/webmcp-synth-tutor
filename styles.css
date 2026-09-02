@@ -1,14 +1,17 @@
 :root {
-  /* Grey scale is the actual "material" now — three distinct steps so
-     panels visibly sit on the case, and buttons visibly sit on panels,
-     instead of everything blending into one near-black value. */
-  --bg: #18181b;
-  --bg-grid: #101012;
-  --panel: #26262b;
-  --panel-raised: #36363d;
-  --panel-sunken: #19191c;
-  --border: #3f3f47;
-  --seam: #55555f;
+  /* Grey scale is the actual "material" now. Previous attempt used small
+     linear steps (+14, +16 per channel) that measured as "distinct" but
+     read as nearly identical once rendered — dark tones need much bigger
+     raw gaps to look like equal perceptual steps (gamma/low-light contrast
+     sensitivity isn't linear). This ramp roughly follows Tailwind's zinc
+     900/700/600/500/400 — a much bigger, unambiguous jump at every step. */
+  --bg: #0c0c0e;
+  --bg-grid: #08080a;
+  --panel: #52525b;
+  --panel-raised: #71717a;
+  --panel-sunken: #2f2f34;
+  --border: #a1a1aa;
+  --seam: #d4d4d8;
   --text: #ebe9e7;
   --text-dim: #8b8a90;
   /* Mint stays the ONE bright accent (user-driven state: selection, "on",
@@ -26,13 +29,12 @@
   /* Tactile button bevels: raised by default, inverted (pressed-in) when
      active/selected. Shared as variables so every control reads consistently. */
   --bevel-raised:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -3px 4px rgba(0, 0, 0, 0.5),
-    0 2px 3px rgba(0, 0, 0, 0.4);
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.45);
   --bevel-pressed:
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 1px 1px rgba(255, 255, 255, 0.04),
-    inset 0 3px 6px rgba(0, 0, 0, 0.65);
+    inset 0 -1.5px 0 rgba(255, 255, 255, 0.07),
+    inset 0 3px 7px rgba(0, 0, 0, 0.75);
   --radius: 10px;
   --radius-lg: 16px;
   --radius-sm: 8px;
