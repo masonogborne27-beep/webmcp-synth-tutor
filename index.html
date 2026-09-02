@@ -18,15 +18,25 @@
       </div>
       <span class="brand-tagline">osc · filter · envelope · delay — teaches as it turns the knobs</span>
     </div>
-    <div id="mcp-status" class="mcp-status mcp-status--off">
-      <span class="dot"></span>
-      <span class="label">WebMCP: checking…</span>
+    <div class="topbar-right">
+      <div class="patch-character" id="patch-character" title="The current patch, described in words — derived live from the knob values">
+        <span class="patch-character-label">Character</span>
+        <span class="patch-character-words" id="patch-character-words"></span>
+      </div>
+      <div id="mcp-status" class="mcp-status mcp-status--off">
+        <span class="dot"></span>
+        <span class="label">WebMCP: checking…</span>
+      </div>
     </div>
   </header>
 
   <section class="agent-panel">
     <div class="agent-header">
       <h2>Ask the agent</h2>
+      <div id="agent-status" class="agent-status agent-status--ready">
+        <span class="agent-status-dot"></span>
+        <span class="agent-status-label">Agent ready</span>
+      </div>
     </div>
     <div id="agent-log" class="agent-log">
       <div class="agent-msg agent-msg--status">Type what you want the sound to feel like — "warmer", "punchier bass", "a lo-fi beat" — and the agent will turn the actual knobs and explain why. Keep going: each reply builds on the last.</div>

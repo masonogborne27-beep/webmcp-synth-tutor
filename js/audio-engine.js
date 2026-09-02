@@ -57,6 +57,43 @@ function describeModule(engine, param) {
   return '';
 }
 
+// The same patch, said in the words a beginner would actually reach for.
+// Purely rule-based off live parameter values — the teaching angle in
+// miniature: it shows that "warm" and "plucky" are not vibes, they are the
+// cutoff and the envelope, and it moves the instant you turn the knob.
+// Three slots: how bright it is, what character the filter/mix give it, and
+// how it behaves over the life of a note.
+function describePatchCharacter(engine) {
+  const { filterFreq: cutoff, filterQ: q, envelope: env, oscillators: oscs } = engine;
+  const words = [];
+
+  if (cutoff < 500) words.push('DARK');
+  else if (cutoff < 1200) words.push('WARM');
+  else if (cutoff < 3000) words.push('MELLOW');
+  else if (cutoff < 8000) words.push('BRIGHT');
+  else words.push('SHARP');
+
+  const audible = oscs.filter((o) => o.level > 0.05);
+  const spread = audible.some((o) => Math.abs(o.detune) > 4) ||
+    new Set(audible.map((o) => o.semitone)).size > 1;
+  if (q >= 10) words.push('SCREAMING');
+  else if (q >= 5) words.push('SQUELCHY');
+  else if (q >= 2.5) words.push('VOCAL');
+  else if (audible.length >= 3 || (audible.length >= 2 && spread)) words.push('THICK');
+  else if (audible.length >= 2) words.push('FULL');
+  else words.push('ROUND');
+
+  const wet = engine.effect.enabled ? engine.effect.mix : 0;
+  if (env.attack >= 0.5) words.push('SWELLING');
+  else if (env.release >= 1.2 || wet >= 0.5) words.push('CAVERNOUS');
+  else if (env.sustain <= 0.25 && env.decay <= 0.35) words.push('PLUCKY');
+  else if (env.attack <= 0.02 && env.sustain <= 0.6) words.push('PUNCHY');
+  else if (wet >= 0.3) words.push('SPACIOUS');
+  else words.push('SUSTAINED');
+
+  return words;
+}
+
 // A full readout of every module, used to diff engine state across an agent
 // turn. Diffing actual state is how we know what "changed" — no bookkeeping
 // inside the tools to get out of sync, and a value overwritten later in the

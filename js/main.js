@@ -11,6 +11,7 @@ initPresets(engine, uiHandles);
 // Subscribes the annotation bubbles to engine changes, so their numbers are
 // re-derived from live state on every change no matter what caused it.
 initAnnotations(engine);
+initPatchCharacter(engine);
 
 const toolDefs = buildToolDefs({ engine, ...uiHandles });
 const mcpReady = registerWebMcpTools(toolDefs);

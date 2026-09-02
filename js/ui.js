@@ -67,6 +67,14 @@ function moduleTitle(text) {
   return el('h3', 'module-title', [text]);
 }
 
+// Silkscreened spec text at the foot of a faceplate — the kind of thing a
+// real panel prints under a control. Flavor, but accurate flavor: the filter
+// really is a 12 dB/oct lowpass (BiquadFilterNode), the envelope really does
+// ramp linearly, the delay line really is fixed at 280 ms.
+function moduleSpec(text) {
+  return el('div', 'module-spec', [text]);
+}
+
 // ---- log-scale helpers for the filter cutoff knob ----
 function sliderToHz(v) {
   const minLog = Math.log(20), maxLog = Math.log(20000);
@@ -176,6 +184,7 @@ function buildOscillatorModule(index, engine, onLogged) {
     posMin: 0, posMax: 1, step: 0.01,
     initialPos: engine.oscillators[index].level,
     format: (v) => v.toFixed(2),
+    scaleMin: '0', scaleMax: '1',
     onChange: (v) => {
       engine.setOscillator(index, { level: v });
       oscState.level = v;
@@ -190,10 +199,12 @@ function buildOscillatorModule(index, engine, onLogged) {
     posMin: -24, posMax: 24, step: 1,
     initialPos: engine.oscillators[index].semitone,
     format: (v) => (v === 0 ? '0 st' : `${v > 0 ? '+' : ''}${v} st`),
+    scaleMin: '−24', scaleMax: '+24',
     onChange: (v) => { engine.setOscillator(index, { semitone: v }); onLogged(`oscillator-${index}`); },
   });
 
   module.append(el('div', 'knob-row', [levelKnob.el, tuneKnob.el]));
+  module.append(moduleSpec(`VCO ${index + 1} · ±24 ST`));
   module.append(annotationSlot(`oscillator-${index}`));
   updatePower();
   redrawWave();
@@ -263,6 +274,7 @@ function buildFilterModule(engine, onLogged) {
     initialPos: hzToSlider(engine.filterFreq),
     toReal: sliderToHz, toPos: hzToSlider,
     format: (v) => `${Math.round(v)} Hz`,
+    scaleMin: '20', scaleMax: '20k',
     onChange: (hz) => { engine.setFilter({ cutoff: hz }); redraw(); onLogged('filter'); },
   });
   const resonanceKnob = createKnob({
@@ -270,10 +282,12 @@ function buildFilterModule(engine, onLogged) {
     posMin: 0, posMax: 20, step: 0.1,
     initialPos: engine.filterQ,
     format: (v) => v.toFixed(1),
+    scaleMin: '0', scaleMax: '20',
     onChange: (q) => { engine.setFilter({ resonance: q }); redraw(); onLogged('filter'); },
   });
 
   module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el]));
+  module.append(moduleSpec('LOWPASS · 12 dB/OCT'));
   module.append(annotationSlot('filter'));
   redraw();
 
@@ -320,16 +334,16 @@ function buildEnvelopeModule(engine, onLogged) {
   const redraw = () => drawEnvelopeViz(svg, state);
 
   const specs = [
-    ['attack', 'Attack', 0, 3, (v) => `${v.toFixed(2)}s`],
-    ['decay', 'Decay', 0, 3, (v) => `${v.toFixed(2)}s`],
-    ['sustain', 'Sustain', 0, 1, (v) => v.toFixed(2)],
-    ['release', 'Release', 0, 4, (v) => `${v.toFixed(2)}s`],
+    ['attack', 'Attack', 0, 3, (v) => `${v.toFixed(2)}s`, '0', '3s'],
+    ['decay', 'Decay', 0, 3, (v) => `${v.toFixed(2)}s`, '0', '3s'],
+    ['sustain', 'Sustain', 0, 1, (v) => v.toFixed(2), '0', '1'],
+    ['release', 'Release', 0, 4, (v) => `${v.toFixed(2)}s`, '0', '4s'],
   ];
   const knobs = {};
-  const knobEls = specs.map(([key, label, min, max, format]) => {
+  const knobEls = specs.map(([key, label, min, max, format, scaleMin, scaleMax]) => {
     const knob = createKnob({
       label, posMin: min, posMax: max, step: 0.01,
-      initialPos: engine.envelope[key], format,
+      initialPos: engine.envelope[key], format, scaleMin, scaleMax,
       onChange: (v) => {
         state[key] = v;
         engine.setEnvelope({ [key]: v });
@@ -343,6 +357,7 @@ function buildEnvelopeModule(engine, onLogged) {
   // Graph on the left half, the 4 knobs as a 2x2 grid on the right half.
   const knobGrid = el('div', 'knob-grid', knobEls);
   module.append(el('div', 'envelope-body', [svg, knobGrid]));
+  module.append(moduleSpec('ADSR · LINEAR'));
   module.append(annotationSlot('envelope'));
   redraw();
 
@@ -378,9 +393,13 @@ function buildEffectModule(engine, onLogged) {
     label: 'Mix', posMin: 0, posMax: 1, step: 0.01,
     initialPos: engine.effect.mix,
     format: (v) => v.toFixed(2),
+    scaleMin: 'dry', scaleMax: 'wet',
     onChange: (v) => { engine.setEffect({ mix: v }); onLogged('effect'); },
   });
   module.append(el('div', 'knob-row', [mixKnob.el]));
+  // Kept short: the Delay faceplate is deliberately narrow, so the longer
+  // "FEEDBACK LINE" wraps to two lines in it.
+  module.append(moduleSpec('FEEDBACK · 280 MS'));
   module.append(annotationSlot('effect'));
 
   return {
@@ -641,6 +660,24 @@ function initAnnotations(engine) {
   annotationEngine = engine;
   engine.onChange((param) => renderAnnotation(param));
   MODULE_PARAMS.forEach((p) => renderAnnotation(p));
+}
+
+// The word-level readout of the patch, re-derived on every change from the
+// same live state the knobs show — so a viewer can watch "WARM" become
+// "BRIGHT" as the cutoff opens, which is the whole teaching point.
+function initPatchCharacter(engine) {
+  const target = document.getElementById('patch-character-words');
+  if (!target) return;
+  const render = () => {
+    const words = describePatchCharacter(engine);
+    target.textContent = '';
+    words.forEach((word, i) => {
+      if (i) target.append(el('span', 'patch-character-sep', ['·']));
+      target.append(el('span', 'patch-character-word', [word]));
+    });
+  };
+  engine.onChange(render);
+  render();
 }
 
 function renderAnnotation(param) {

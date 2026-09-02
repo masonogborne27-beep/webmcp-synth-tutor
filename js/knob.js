@@ -73,6 +73,9 @@ function createKnob(opts) {
   const {
     label, posMin, posMax, initialPos, step = 0,
     toReal = (p) => p, toPos = (r) => r, format = (v) => String(v), onChange,
+    // Optional silkscreened range printed at the dial's extremes, the way a
+    // hardware panel marks what the sweep actually spans.
+    scaleMin, scaleMax,
   } = opts;
 
   let pos = initialPos;
@@ -87,11 +90,18 @@ function createKnob(opts) {
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
   svg.setAttribute('class', 'knob-dial');
 
-  const ticks = [KNOB_MIN_ANGLE, 0, KNOB_MAX_ANGLE].map((angle) => {
+  // A ring of ticks around the sweep rather than just three: the graduated
+  // scale is most of what makes a dial read as a real panel control. The
+  // endpoints and centre are drawn longer/brighter as major graduations, the
+  // rest sit faint behind the cap.
+  const TICK_COUNT = 11;
+  const ticks = Array.from({ length: TICK_COUNT }, (_, i) => {
+    const angle = KNOB_MIN_ANGLE + (i / (TICK_COUNT - 1)) * (KNOB_MAX_ANGLE - KNOB_MIN_ANGLE);
+    const major = i === 0 || i === TICK_COUNT - 1 || i === (TICK_COUNT - 1) / 2;
     const inner = polarToCartesian(cx, cy, r + 4, angle);
-    const outer = polarToCartesian(cx, cy, r + 7, angle);
+    const outer = polarToCartesian(cx, cy, r + (major ? 8 : 6), angle);
     const tick = document.createElementNS(svgNS, 'line');
-    tick.setAttribute('class', 'knob-tick');
+    tick.setAttribute('class', `knob-tick${major ? ' knob-tick--major' : ''}`);
     tick.setAttribute('x1', inner.x); tick.setAttribute('y1', inner.y);
     tick.setAttribute('x2', outer.x); tick.setAttribute('y2', outer.y);
     return tick;
@@ -128,7 +138,17 @@ function createKnob(opts) {
   const valueEl = document.createElement('div');
   valueEl.className = 'knob-value';
 
-  wrap.append(svg, labelEl, valueEl);
+  // The printed range, sat under the dial where the sweep ends. Every knob
+  // carries one so they all stay the same height in a row, and so the panel
+  // reads as consistently graduated rather than annotated here and there.
+  const scaleEl = document.createElement('div');
+  scaleEl.className = 'knob-scale';
+  scaleEl.append(
+    Object.assign(document.createElement('span'), { textContent: scaleMin ?? '' }),
+    Object.assign(document.createElement('span'), { textContent: scaleMax ?? '' })
+  );
+
+  wrap.append(svg, scaleEl, labelEl, valueEl);
 
   function render() {
     const norm = clamp((pos - posMin) / (posMax - posMin), 0, 1);

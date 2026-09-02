@@ -421,6 +421,22 @@ function initAgentPanel(toolDefs, engine) {
 
   const agent = new Agent(toolDefs, PROVIDERS.shared, engine);
 
+  // Ready / thinking / responded, legible at a glance instead of inferred
+  // from whether the Send button happens to be greyed out.
+  const statusEl = document.getElementById('agent-status');
+  const statusLabel = statusEl.querySelector('.agent-status-label');
+  const AGENT_STATES = ['ready', 'thinking', 'responded', 'error'];
+  let respondedTimer = null;
+  const setAgentState = (state, text) => {
+    AGENT_STATES.forEach((s) => statusEl.classList.toggle(`agent-status--${s}`, s === state));
+    statusLabel.textContent = text;
+    clearTimeout(respondedTimer);
+    // "Just responded" is a moment, not a resting state — settle back to ready.
+    if (state === 'responded') {
+      respondedTimer = setTimeout(() => setAgentState('ready', 'Agent ready'), 4000);
+    }
+  };
+
   let busy = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -436,15 +452,22 @@ function initAgentPanel(toolDefs, engine) {
     sendBtn.disabled = true;
     const statusMsg = appendChatMessage('status', 'Thinking…');
 
+    setAgentState('thinking', 'Thinking');
     try {
       const reply = await agent.send(text, {
-        onStatus: (s) => { statusMsg.textContent = s === 'thinking' ? 'Thinking…' : `Turning knobs (${s})…`; },
+        onStatus: (s) => {
+          const thinking = s === 'thinking';
+          statusMsg.textContent = thinking ? 'Thinking…' : `Turning knobs (${s})…`;
+          setAgentState('thinking', thinking ? 'Thinking' : 'Turning knobs');
+        },
       });
       statusMsg.remove();
       appendChatMessage('agent', reply.text, reply.changed);
+      setAgentState('responded', 'Just responded');
     } catch (err) {
       statusMsg.remove();
       appendChatMessage('error', err.message || 'Something went wrong talking to the agent.');
+      setAgentState('error', 'Agent error');
     } finally {
       busy = false;
       sendBtn.disabled = false;
