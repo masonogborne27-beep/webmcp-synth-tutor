@@ -654,6 +654,14 @@ function renderAnnotation(param) {
   if (applied) inline.append(el('span', 'applied', [` (now: ${applied})`]));
 }
 
+// One suggestion is on screen at a time: a new request clears the bubbles the
+// last one left behind, so the annotations always describe the change the user
+// just asked for rather than accumulating across requests.
+function clearAllAnnotations() {
+  annotationReasons.clear();
+  MODULE_PARAMS.forEach((p) => renderAnnotation(p));
+}
+
 // reason set -> the agent explained this module. reason omitted/empty -> the
 // user just moved this knob themselves, which retires the agent's explanation
 // for it rather than leaving stale prose over a value the user has overridden.

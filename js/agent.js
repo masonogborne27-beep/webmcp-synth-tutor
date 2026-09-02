@@ -283,6 +283,9 @@ class Agent {
         throw err;
       }
     }
+    // Retire the previous request's bubbles up front, so the ones that appear
+    // belong to the request now in flight.
+    clearAllAnnotations();
     onStatus?.('thinking');
     const model = await provider.resolveModel(apiKey);
     const declarations = provider.toDeclarations(this.toolDefs);
@@ -426,6 +429,9 @@ function initAgentPanel(toolDefs, engine) {
 
     appendChatMessage('user', text);
     input.value = '';
+    // The example prompt is onboarding, not decoration — once someone has
+    // asked for something, they know what the box is for.
+    input.placeholder = '';
     busy = true;
     sendBtn.disabled = true;
     const statusMsg = appendChatMessage('status', 'Thinking…');
