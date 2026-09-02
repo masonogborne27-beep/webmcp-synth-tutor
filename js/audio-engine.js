@@ -18,6 +18,12 @@ const DEFAULT_OSCILLATORS = [
   { waveform: 'sine', level: 0, detune: 0, semitone: -12 },
 ];
 
+// The delay line's own fixed characteristics — not user-adjustable (only
+// enabled/mix are), but real values the UI reads to describe and visualize
+// the echo, rather than a second copy of these numbers hardcoded in ui.js.
+const DELAY_TIME_S = 0.28;
+const DELAY_FEEDBACK = 0.35;
+
 // The canonical list of things that can carry a value, an annotation bubble,
 // and a line in the agent's reply. Keyed the same everywhere.
 const MODULE_PARAMS = ['oscillator-0', 'oscillator-1', 'oscillator-2', 'filter', 'envelope', 'effect'];
@@ -190,9 +196,9 @@ class SynthEngine {
 
     // Wet path: filter output -> delay (with feedback) -> wetGain -> master.
     this.delayNode = ctx.createDelay(2.0);
-    this.delayNode.delayTime.value = 0.28;
+    this.delayNode.delayTime.value = DELAY_TIME_S;
     this.feedbackGain = ctx.createGain();
-    this.feedbackGain.gain.value = 0.35;
+    this.feedbackGain.gain.value = DELAY_FEEDBACK;
     this.wetGain = ctx.createGain();
     this.wetGain.gain.value = 0;
 

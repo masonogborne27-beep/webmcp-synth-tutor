@@ -509,6 +509,45 @@ function buildEnvelopeModule(engine, onLogged) {
   };
 }
 
+// Each bar is one echo repeat. Bar i's amplitude is mix * feedback^i — the
+// exact factor the feedback loop actually applies i times over, not a
+// decorative approximation — so a real feedback change would visibly alter
+// how many bars survive above the "near-zero" floor before this fades out.
+// feedback is presently fixed (DELAY_FEEDBACK), but mix and enabled are the
+// two values that do change live, and both drive this directly.
+const DELAY_ECHO_BARS = 6;
+const DELAY_ECHO_FLOOR = 0.03; // repeats quieter than this aren't worth drawing
+
+function drawDelayEcho(canvas, engine) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const { enabled, mix } = engine.effect;
+  const style = getComputedStyle(document.documentElement);
+  const accent = style.getPropertyValue('--accent').trim() || '#5eead4';
+  const dim = style.getPropertyValue('--text-dim').trim() || '#8b8a90';
+
+  const gap = 5;
+  const barW = (w - gap * (DELAY_ECHO_BARS - 1)) / DELAY_ECHO_BARS;
+  for (let i = 0; i < DELAY_ECHO_BARS; i++) {
+    const amp = enabled ? mix * Math.pow(DELAY_FEEDBACK, i) : 0;
+    const x = i * (barW + gap);
+    if (!enabled || amp < DELAY_ECHO_FLOOR) {
+      // Inactive/decayed-away: a flat, dim baseline tick rather than an
+      // empty gap, so "off" reads as a deliberate state, not a rendering gap.
+      ctx.fillStyle = dim;
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(x, h - 2, barW, 2);
+      continue;
+    }
+    const barH = Math.max(2, amp * (h - 4));
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = Math.max(0.18, amp);
+    ctx.fillRect(x, h - barH, barW, barH);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function buildEffectModule(engine, onLogged) {
   const module = el('section', 'module module--effect');
   module.append(moduleTitle('Delay'));
@@ -520,6 +559,7 @@ function buildEffectModule(engine, onLogged) {
   toggleWrap.append(checkbox, el('span', 'toggle-track'), el('span', 'toggle-label', ['On']));
   checkbox.addEventListener('change', () => {
     engine.setEffect({ enabled: checkbox.checked });
+    redrawEcho();
     onLogged('effect');
   });
   module.append(toggleWrap);
@@ -529,19 +569,30 @@ function buildEffectModule(engine, onLogged) {
     initialPos: engine.effect.mix,
     format: (v) => v.toFixed(2),
     scaleMin: 'dry', scaleMax: 'wet',
-    onChange: (v) => { engine.setEffect({ mix: v }); onLogged('effect'); },
+    onChange: (v) => { engine.setEffect({ mix: v }); redrawEcho(); onLogged('effect'); },
   });
   module.append(el('div', 'knob-row', [mixKnob.el]));
-  // Kept short: the Delay faceplate is deliberately narrow, so the longer
-  // "FEEDBACK LINE" wraps to two lines in it.
-  module.append(moduleSpec('FEEDBACK · 280 MS'));
+
+  const echoCanvas = document.createElement('canvas');
+  echoCanvas.width = 140; echoCanvas.height = 54;
+  echoCanvas.className = 'delay-echo';
+  const redrawEcho = () => drawDelayEcho(echoCanvas, engine);
+  module.append(echoCanvas);
+
+  // The real fixed values behind the echo above: this delay line always
+  // repeats every 280ms (DELAY_TIME_S) with each repeat at 35% of the last
+  // (DELAY_FEEDBACK) — not a decorative caption, the exact numbers the bars
+  // are computed from.
+  module.append(moduleSpec(`${Math.round(DELAY_TIME_S * 1000)} MS · FB ${DELAY_FEEDBACK.toFixed(2)}`));
   module.append(annotationSlot('effect'));
+  redrawEcho();
 
   return {
     module,
     setState({ enabled, mix }) {
       if (enabled != null) checkbox.checked = enabled;
       if (mix != null) mixKnob.setReal(mix);
+      redrawEcho();
     },
   };
 }
@@ -779,6 +830,99 @@ function groundText(text, engine) {
   out = out.replace(PARAM_NUMBER_RE, '$1');
   // Tidy the punctuation left behind by a removed clause.
   return out.replace(/\s+([,.;!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+}
+
+// ---- signal-flow connector ----
+// A static SVG overlay drawn through the existing gaps between panels —
+// never resizes or repositions a module — tracing the real audio graph:
+// the 3 oscillators mix down and feed the envelope's amplitude gain, which
+// feeds the filter, which feeds the delay, which feeds the output. That
+// order (envelope, then filter) matches audio-engine.js's actual node
+// wiring (mixNode -> envGain -> filterNode), not the more common "filter
+// then envelope" synth convention — it happens to also match the current
+// left-to-right panel order (Envelope, Filter, Delay), so no panel needed
+// to move to keep the line straight and accurate.
+function initSignalFlow() {
+  const instrument = document.querySelector('.instrument');
+  const rowTop = document.getElementById('row-top');
+  const rowOsc = document.getElementById('row-osc');
+  const envelopeEl = document.querySelector('.module--envelope');
+  const filterEl = document.querySelector('.module--filter');
+  const delayEl = document.querySelector('.module--effect');
+  const oscEls = [...rowOsc.children];
+  if (!envelopeEl || !filterEl || !delayEl || oscEls.length === 0) return;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'signal-flow');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const group = document.createElementNS(svgNS, 'g');
+  svg.append(group);
+  instrument.prepend(svg);
+
+  const rel = (elem, ir) => {
+    const r = elem.getBoundingClientRect();
+    return {
+      top: r.top - ir.top, bottom: r.bottom - ir.top,
+      left: r.left - ir.left, right: r.right - ir.left,
+      centerX: (r.left + r.right) / 2 - ir.left,
+    };
+  };
+
+  // A chevron drawn as its own small path at a segment's midpoint, rather
+  // than a marker glued to the line's end — reads as "direction of flow
+  // partway along," not as an arrow poking into the next panel's border.
+  const chevronAt = (x, y, angleDeg) => svgEl('path', {
+    class: 'signal-flow-chevron',
+    d: 'M -3,-4 L 3,0 L -3,4',
+    transform: `translate(${x} ${y}) rotate(${angleDeg})`,
+  });
+
+  const segment = (x1, y1, x2, y2, angleDeg) => {
+    const frag = document.createDocumentFragment();
+    frag.append(svgEl('line', { x1, y1, x2, y2, class: 'signal-flow-line' }));
+    if (angleDeg != null) frag.append(chevronAt((x1 + x2) / 2, (y1 + y2) / 2, angleDeg));
+    return frag;
+  };
+
+  function redraw() {
+    const ir = instrument.getBoundingClientRect();
+    if (!ir.width || !ir.height) return;
+    svg.setAttribute('width', ir.width);
+    svg.setAttribute('height', ir.height);
+    svg.setAttribute('viewBox', `0 0 ${ir.width} ${ir.height}`);
+    group.textContent = '';
+
+    const oscR = oscEls.map((e) => rel(e, ir));
+    const envR = rel(envelopeEl, ir);
+    const filterR = rel(filterEl, ir);
+    const delayR = rel(delayEl, ir);
+    const rowTopR = rel(rowTop, ir);
+    const rowOscR = rel(rowOsc, ir);
+
+    // Three oscillators converge to one point in the gap before continuing
+    // up as a single mixed signal — never three parallel lines all the way.
+    const mergeX = oscR.reduce((sum, r) => sum + r.centerX, 0) / oscR.length;
+    const mergeY = (rowTopR.bottom + rowOscR.top) / 2;
+    oscR.forEach((r) => group.append(segment(r.centerX, rowOscR.top - 1, mergeX, mergeY)));
+
+    // Keep the merge-to-envelope entry point inside Envelope's own span even
+    // at extreme aspect ratios, where the plain average of 3 OSC centers
+    // could otherwise land past Envelope's edge.
+    const entryX = Math.min(Math.max(mergeX, envR.left + 14), envR.right - 14);
+    group.append(segment(mergeX, mergeY, entryX, rowTopR.bottom + 1, -90));
+
+    const midY = (rowTopR.top + rowTopR.bottom) / 2;
+    group.append(segment(envR.right + 1, midY, filterR.left - 1, midY, 0));
+    group.append(segment(filterR.right + 1, midY, delayR.left - 1, midY, 0));
+    // A short stub past Delay implies "-> Output" without reaching all the
+    // way down into the separate keyboard/output section below.
+    group.append(segment(delayR.right + 1, midY, delayR.right + 20, midY, 0));
+  }
+
+  redraw();
+  new ResizeObserver(redraw).observe(instrument);
 }
 
 // ---- inline speech-bubble annotations ----

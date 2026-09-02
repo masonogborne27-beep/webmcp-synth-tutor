@@ -419,7 +419,34 @@ body {
 
 /* ---------- the instrument: Envelope/Filter/Delay on top, the 3
    oscillators in the middle, a full-width Output stage on the bottom. ---------- */
-.instrument { padding: 10px 24px 24px; display: flex; flex-direction: column; gap: 26px; }
+.instrument { position: relative; padding: 10px 24px 24px; display: flex; flex-direction: column; gap: 26px; }
+
+/* Signal-flow connector: drawn only through the existing gaps between
+   panels, never resizing or repositioning one. Sits behind the modules
+   (prepended, so it paints first) — it should look like it's emerging from
+   behind each faceplate's edge, not laid over its surface. Static and low-
+   opacity by design: an informative structural line, not a decoration. */
+.signal-flow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.signal-flow-line {
+  stroke: var(--accent);
+  stroke-width: 1.25;
+  opacity: 0.32;
+}
+.signal-flow-chevron {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.5;
+}
 
 /* flex-start, not stretch: a faceplate is as tall as what's printed on it.
    Stretching locked every panel in a row to the tallest one, so a module
@@ -632,7 +659,7 @@ body {
 /* ---------- filter / envelope / oscillator visuals: sunken "glass"
    screens set into the faceplate — kept quiet and plain on purpose, the
    Output scope below is the one dramatic element ---------- */
-.filter-curve, .osc-viz {
+.filter-curve, .osc-viz, .delay-echo {
   width: 100%;
   height: 90px;
   background: var(--bg-grid);
@@ -642,6 +669,10 @@ body {
   display: block;
 }
 .osc-viz { margin-bottom: 12px; }
+/* Shorter than the other glass screens — a secondary readout, not the
+   module's main visual — and given its own top margin since it sits below
+   the knob row rather than above it like the others. */
+.delay-echo { height: 54px; margin-top: 14px; }
 .envelope-viz {
   width: 100%;
   height: 90px;

@@ -8,6 +8,7 @@ const uiHandles = buildSignalPath(engine, onLogged);
 
 buildKeyboardUnit(engine);
 initPresets(engine, uiHandles);
+initSignalFlow();
 // Subscribes the annotation bubbles to engine changes, so their numbers are
 // re-derived from live state on every change no matter what caused it.
 initAnnotations(engine);
