@@ -395,12 +395,29 @@ function buildEffectModule(engine, onLogged) {
 // The one deliberately dramatic element on the page (a CRT-style glowing
 // trace) — everything else on the instrument stays quiet and disciplined
 // around it, by design.
-function buildOutputModule(engine) {
-  const module = el('div', 'output-scope');
+function buildSignalPath(engine, onLogged) {
+  const rowTop = document.getElementById('row-top');
+  const rowOsc = document.getElementById('row-osc');
+
+  const oscUIs = [0, 1, 2].map((i) => buildOscillatorModule(i, engine, onLogged));
+  const filterUI = buildFilterModule(engine, onLogged);
+  const envelopeUI = buildEnvelopeModule(engine, onLogged);
+  const effectUI = buildEffectModule(engine, onLogged);
+
+  rowTop.append(envelopeUI.module, filterUI.module, effectUI.module);
+  oscUIs.forEach((o) => rowOsc.append(o.module));
+
+  return { oscUIs, filterUI, envelopeUI, effectUI };
+}
+
+// ---- keyboard unit: Output scope + physical keybed, built together as the
+// one hardware strip they're now fused into visually. ----
+function buildKeyboardUnit(engine) {
+  const outputHero = document.getElementById('output-hero');
   const canvas = document.createElement('canvas');
   canvas.width = 800; canvas.height = 100;
   canvas.className = 'scope';
-  module.append(canvas, el('div', 'output-scope-label', ['Output']));
+  outputHero.append(canvas, el('div', 'output-scope-label', ['Output']));
 
   const ctx = canvas.getContext('2d');
   const style = getComputedStyle(document.documentElement);
@@ -432,29 +449,6 @@ function buildOutputModule(engine) {
   }
   draw();
 
-  return { module };
-}
-
-function buildSignalPath(engine, onLogged) {
-  const rowTop = document.getElementById('row-top');
-  const rowOsc = document.getElementById('row-osc');
-  const outputHero = document.getElementById('output-hero');
-
-  const oscUIs = [0, 1, 2].map((i) => buildOscillatorModule(i, engine, onLogged));
-  const filterUI = buildFilterModule(engine, onLogged);
-  const envelopeUI = buildEnvelopeModule(engine, onLogged);
-  const effectUI = buildEffectModule(engine, onLogged);
-  const outputUI = buildOutputModule(engine);
-
-  rowTop.append(envelopeUI.module, filterUI.module, effectUI.module);
-  oscUIs.forEach((o) => rowOsc.append(o.module));
-  outputHero.append(outputUI.module);
-
-  return { oscUIs, filterUI, envelopeUI, effectUI, outputUI };
-}
-
-// ---- keyboard ----
-function initKeyboard(engine) {
   const container = document.getElementById('keyboard');
   const keyEls = {};
 

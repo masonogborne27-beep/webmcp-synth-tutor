@@ -3,7 +3,7 @@ const engine = new SynthEngine();
 const onLogged = (param) => addReasoningLogEntry(param, '');
 const uiHandles = buildSignalPath(engine, onLogged);
 
-initKeyboard(engine);
+buildKeyboardUnit(engine);
 initPresets(engine, uiHandles);
 
 const toolDefs = buildToolDefs({ engine, ...uiHandles });
