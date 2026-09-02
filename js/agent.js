@@ -448,6 +448,12 @@ function initAgentPanel(toolDefs, engine) {
     // The example prompt is onboarding, not decoration — once someone has
     // asked for something, they know what the box is for.
     input.placeholder = '';
+    // Drop focus the moment the request is sent, not when the reply lands —
+    // the keyboard's QWERTY shortcuts are disabled while a text input is
+    // focused (so typing a prompt doesn't also play notes), and the whole
+    // point of asking the agent is to go straight into playing while it
+    // works, not to sit in the input waiting.
+    input.blur();
     busy = true;
     sendBtn.disabled = true;
     const statusMsg = appendChatMessage('status', 'Thinking…');
@@ -471,7 +477,9 @@ function initAgentPanel(toolDefs, engine) {
     } finally {
       busy = false;
       sendBtn.disabled = false;
-      input.focus();
+      // No re-focus here on purpose — see the blur() above. Refocusing once
+      // the reply lands would put the user right back in typing mode instead
+      // of leaving them free to keep playing.
     }
   });
 }
