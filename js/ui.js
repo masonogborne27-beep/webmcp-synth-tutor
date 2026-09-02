@@ -301,8 +301,15 @@ function buildFilterModule(engine, onLogged) {
   };
 }
 
-function drawEnvelopeViz(svg, env) {
-  const w = 120, h = 90, floor = h - 2;
+const ENV_VIEW = { w: 120, h: 90 };
+
+// The curve's geometry, computed once and shared by everything drawn on the
+// graph: the line itself, the stage labels beneath it, and the playhead that
+// travels it while a note sounds. One source of shape, so a label or the
+// playhead can never sit somewhere the curve isn't.
+function envelopeGeometry(env) {
+  const { w, h } = ENV_VIEW;
+  const floor = h - 2;
   const totalTime = Math.max(env.attack + env.decay + env.release, 0.3) * 1.4;
   const holdFrac = 0.35;
   const x1 = (env.attack / totalTime) * w;
@@ -310,12 +317,49 @@ function drawEnvelopeViz(svg, env) {
   const sustainEnd = x2 + holdFrac * w;
   const x3 = Math.min(sustainEnd + (env.release / totalTime) * w, w);
   const sustainY = floor - env.sustain * (floor - 2);
+  return { w, h, floor, peakY: 2, x1, x2, sustainEnd: Math.min(sustainEnd, w - 1), x3, sustainY };
+}
+
+function drawEnvelopeViz(svg, env) {
+  const g = envelopeGeometry(env);
   const linePoints = [
-    [0, floor], [x1, 2], [x2, sustainY], [Math.min(sustainEnd, w - 1), sustainY], [x3, floor],
+    [0, g.floor], [g.x1, g.peakY], [g.x2, g.sustainY], [g.sustainEnd, g.sustainY], [g.x3, g.floor],
   ];
-  const fillPoints = [...linePoints, [x3, floor + 2], [0, floor + 2]];
+  const fillPoints = [...linePoints, [g.x3, g.floor + 2], [0, g.floor + 2]];
   svg.querySelector('polyline.line').setAttribute('points', linePoints.map((p) => p.join(',')).join(' '));
   svg.querySelector('polyline.fill').setAttribute('points', fillPoints.map((p) => p.join(',')).join(' '));
+  return g;
+}
+
+// Stage names printed along the bottom of the graph, each centred under the
+// segment it belongs to. Rendered as HTML rather than SVG <text>: the graph
+// stretches with preserveAspectRatio="none", which would squash type.
+// A segment too narrow to hold its own name is left unlabelled instead of
+// letting a fast attack overprint the decay beside it.
+const ENV_STAGES = ['Attack', 'Decay', 'Sustain', 'Release'];
+
+// A label is shown only if the text actually fits inside its own segment.
+// Measuring beats a percentage threshold here: the same 12%-wide segment
+// holds "DECAY" comfortably on a wide panel and not at all on a narrow one,
+// so the cutoff has to be in pixels, against the rendered text.
+function layoutEnvelopeStages(stageEls, g, pixelWidth) {
+  const bounds = [[0, g.x1], [g.x1, g.x2], [g.x2, g.sustainEnd], [g.sustainEnd, g.x3]];
+  stageEls.forEach((elem, i) => {
+    const [from, to] = bounds[i];
+    elem.style.left = `${((from + to) / 2 / g.w) * 100}%`;
+    elem.style.visibility = 'visible';
+  });
+  if (!pixelWidth) return;
+  stageEls.forEach((elem, i) => {
+    const [from, to] = bounds[i];
+    const segmentPx = ((to - from) / g.w) * pixelWidth;
+    elem.style.visibility = elem.offsetWidth + 6 <= segmentPx ? 'visible' : 'hidden';
+    // Centre-on-segment would let the last label hang off the right edge, so
+    // nudge it back inside by its own half-width.
+    const halfPct = (elem.offsetWidth / 2 / pixelWidth) * 100;
+    const centrePct = ((from + to) / 2 / g.w) * 100;
+    elem.style.left = `${clamp(centrePct, halfPct + 1.5, 100 - halfPct - 1.5)}%`;
+  });
 }
 
 function buildEnvelopeModule(engine, onLogged) {
@@ -330,8 +374,29 @@ function buildEnvelopeModule(engine, onLogged) {
   svg.append(svgEl('polyline', { class: 'fill', points: '0,88 0,88' }));
   svg.append(svgEl('polyline', { class: 'line', points: '0,88 0,88' }));
 
+  // Playhead: a vertical marker plus a dot riding the curve. The line uses
+  // non-scaling-stroke and the dot is counter-scaled per frame, because the
+  // graph's non-uniform stretch would otherwise render them as a wedge and
+  // an ellipse.
+  const playLine = svgEl('line', {
+    class: 'env-playhead-line', x1: 0, y1: 0, x2: 0, y2: ENV_VIEW.h,
+    'vector-effect': 'non-scaling-stroke',
+  });
+  const playDot = svgEl('circle', { class: 'env-playhead-dot', cx: 0, cy: 0, r: 4 });
+  svg.append(playLine, playDot);
+
+  const stageEls = ENV_STAGES.map((name) => el('span', 'env-stage', [name]));
+  const stageLayer = el('div', 'env-stages', stageEls);
+  const vizWrap = el('div', 'envelope-viz-wrap', [svg, stageLayer]);
+
   const state = { ...engine.envelope };
-  const redraw = () => drawEnvelopeViz(svg, state);
+  let geometry = envelopeGeometry(state);
+  const redraw = () => {
+    geometry = drawEnvelopeViz(svg, state);
+    layoutEnvelopeStages(stageEls, geometry, svg.getBoundingClientRect().width);
+  };
+  // Which labels fit depends on how wide the panel is, so re-test on resize.
+  if (window.ResizeObserver) new ResizeObserver(() => redraw()).observe(vizWrap);
 
   const specs = [
     ['attack', 'Attack', 0, 3, (v) => `${v.toFixed(2)}s`, '0', '3s'],
@@ -354,9 +419,87 @@ function buildEnvelopeModule(engine, onLogged) {
     knobs[key] = knob;
     return knob.el;
   });
+  // ---- live playhead ----
+  // The envelope stops being an abstract diagram the moment you can watch a
+  // note travel it: attack ramp, decay fall, sustain plateau, release tail,
+  // in step with what you're hearing. Driven by the same note trigger that
+  // starts the audio, so the two cannot fall out of sync.
+  //
+  // The plateau is the one part real time can't be mapped onto directly —
+  // the graph draws a fixed-width hold, but a key can be held indefinitely.
+  // The playhead crosses it over HOLD_TRAVERSE_S and then parks at its end,
+  // which reads correctly: it has arrived at sustain and is staying there.
+  const HOLD_TRAVERSE_S = 0.9;
+  let noteStart = 0;
+  let releaseStart = 0;
+  let releaseFrom = null;
+  let rafId = null;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  const setPlayhead = (x, y, visible) => {
+    svg.classList.toggle('env-playing', visible);
+    if (!visible) return;
+    playLine.setAttribute('x1', x);
+    playLine.setAttribute('x2', x);
+    playDot.setAttribute('cx', 0);
+    playDot.setAttribute('cy', 0);
+    // Counter-scale so the dot stays round however the graph is stretched.
+    const rect = svg.getBoundingClientRect();
+    const sx = rect.width ? 4.5 / (4 * (rect.width / geometry.w)) : 1;
+    const sy = rect.height ? 4.5 / (4 * (rect.height / geometry.h)) : 1;
+    playDot.setAttribute('transform', `translate(${x} ${y}) scale(${sx} ${sy})`);
+  };
+
+  // Where on the curve a note of age `t` seconds sits, before release.
+  const heldPosition = (t, g) => {
+    const { attack, decay } = state;
+    if (t < attack) return [lerp(0, g.x1, attack ? t / attack : 1), lerp(g.floor, g.peakY, attack ? t / attack : 1)];
+    const td = t - attack;
+    if (td < decay) return [lerp(g.x1, g.x2, decay ? td / decay : 1), lerp(g.peakY, g.sustainY, decay ? td / decay : 1)];
+    const th = td - decay;
+    return [Math.min(g.x2 + (th / HOLD_TRAVERSE_S) * (g.sustainEnd - g.x2), g.sustainEnd), g.sustainY];
+  };
+
+  const frame = () => {
+    const now = performance.now() / 1000;
+    const g = geometry;
+    if (releaseFrom) {
+      const t = state.release ? (now - releaseStart) / state.release : 1;
+      if (t >= 1) { stopPlayhead(); return; }
+      setPlayhead(lerp(releaseFrom[0], g.x3, t), lerp(releaseFrom[1], g.floor, t), true);
+    } else {
+      const [x, y] = heldPosition(now - noteStart, g);
+      setPlayhead(x, y, true);
+    }
+    rafId = requestAnimationFrame(frame);
+  };
+
+  function stopPlayhead() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    releaseFrom = null;
+    setPlayhead(0, 0, false);
+  }
+
+  engine.onNote((type) => {
+    const now = performance.now() / 1000;
+    if (type === 'on') {
+      noteStart = now;
+      releaseFrom = null;
+      if (!rafId) rafId = requestAnimationFrame(frame);
+    } else {
+      // Release from wherever the note actually got to, not from a fixed
+      // point — a key let go mid-attack falls from mid-attack.
+      releaseFrom = heldPosition(now - noteStart, geometry);
+      releaseStart = now;
+      if (!rafId) rafId = requestAnimationFrame(frame);
+    }
+  });
+
   // Graph on the left half, the 4 knobs as a 2x2 grid on the right half.
   const knobGrid = el('div', 'knob-grid', knobEls);
-  module.append(el('div', 'envelope-body', [svg, knobGrid]));
+  module.append(el('div', 'envelope-body', [vizWrap, knobGrid]));
   module.append(moduleSpec('ADSR · LINEAR'));
   module.append(annotationSlot('envelope'));
   redraw();

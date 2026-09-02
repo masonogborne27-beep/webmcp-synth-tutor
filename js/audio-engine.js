@@ -115,6 +115,20 @@ class SynthEngine {
     // can be checked against the one that really got applied.
     this.lastPresetName = null;
     this._changeListeners = [];
+    this._noteListeners = [];
+  }
+
+  // Note on/off, so a visualisation can follow the envelope in real time
+  // against the same trigger that starts the sound.
+  onNote(fn) {
+    this._noteListeners.push(fn);
+    return () => {
+      this._noteListeners = this._noteListeners.filter((f) => f !== fn);
+    };
+  }
+
+  _notifyNote(type) {
+    this._noteListeners.forEach((fn) => fn(type));
   }
 
   // Any mutation announces which module it touched. Annotation bubbles
@@ -302,6 +316,7 @@ class SynthEngine {
     );
 
     this.activeVoice = { voices, mixNode, envGain, baseFreq: freq };
+    this._notifyNote('on');
   }
 
   noteOff() {
@@ -327,6 +342,7 @@ class SynthEngine {
     }, (release + 0.1) * 1000);
 
     this.activeVoice = null;
+    this._notifyNote('off');
   }
 
   _killActiveVoice() {
