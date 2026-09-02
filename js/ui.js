@@ -220,14 +220,22 @@ function drawFilterCurve(canvas, cutoff, resonance) {
   ctx.clearRect(0, 0, w, h);
   ctx.beginPath();
   const points = 64;
+  // A canvas always clips its own drawing to its element bounds — it cannot
+  // literally escape the box. What was actually happening: at max resonance
+  // the peak's y (and, with a stroke width of 2, any point sitting exactly
+  // on x=0/x=w or y=0/y=h) bled right up to — and its stroke half-width past
+  // — the edge, reading as "poking out of the frame". Insetting every edge
+  // by a margin at least as big as the stroke's half-width fixes this for
+  // every corner, not just the one that was reported.
+  const margin = 3;
   for (let i = 0; i <= points; i++) {
     const freq = 20 * Math.pow(1000, i / points); // 20Hz..20kHz log sweep
     const ratio = freq / cutoff;
     // simple one-pole-ish lowpass magnitude approximation with resonance bump
     const resonanceBump = 1 + (resonance / 20) * Math.exp(-Math.pow(Math.log(ratio), 2) * 4);
     const mag = (1 / Math.sqrt(1 + Math.pow(ratio, 4))) * resonanceBump;
-    const x = (i / points) * w;
-    const y = h - Math.min(mag, 1.4) * (h * 0.72) - 2;
+    const x = clamp((i / points) * w, margin, w - margin);
+    const y = clamp(h - Math.min(mag, 1.4) * (h * 0.72), margin, h - margin);
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
