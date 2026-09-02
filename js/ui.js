@@ -204,10 +204,20 @@ function buildOscillatorModule(index, engine, onLogged) {
   });
 
   module.append(el('div', 'knob-row', [levelKnob.el, tuneKnob.el]));
+
+  // One-word character tag, re-derived live from this oscillator's actual
+  // waveform/tune/level — same pattern as the topbar's overall patch
+  // character readout, scoped to just this oscillator.
+  const characterEl = el('span', 'osc-character-word', ['']);
+  module.append(el('div', 'osc-character', [characterEl]));
+  const updateCharacter = () => { characterEl.textContent = describeOscCharacter(engine.oscillators[index]); };
+  engine.onChange((param) => { if (param === `oscillator-${index}`) updateCharacter(); });
+
   module.append(moduleSpec(`VCO ${index + 1} · ±24 ST`));
   module.append(annotationSlot(`oscillator-${index}`));
   updatePower();
   redrawWave();
+  updateCharacter();
 
   return {
     module,
@@ -221,14 +231,44 @@ function buildOscillatorModule(index, engine, onLogged) {
       if (semitone != null) tuneKnob.setReal(semitone);
       updatePower();
       redrawWave();
+      updateCharacter();
     },
   };
 }
+
+// The curve sweeps 20Hz-20kHz log-mapped linearly across the canvas — this
+// is the inverse of that same mapping, so a reference tick at a given
+// frequency lands exactly under the curve's own x for that frequency,
+// rather than a separately-eyeballed position that could drift from it.
+const FILTER_FREQ_MIN = 20, FILTER_FREQ_MAX = 20000;
+function filterFreqToFrac(freq) {
+  return Math.log(freq / FILTER_FREQ_MIN) / Math.log(FILTER_FREQ_MAX / FILTER_FREQ_MIN);
+}
+const FILTER_FREQ_TICKS = [
+  { freq: 100, label: '100' },
+  { freq: 1000, label: '1k' },
+  { freq: 10000, label: '10k' },
+];
 
 function drawFilterCurve(canvas, cutoff, resonance) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
+  // Faint reference gridlines at 100Hz/1kHz/10kHz, drawn first so the curve
+  // stroke sits on top of them.
+  const gridStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#a1a1aa';
+  ctx.save();
+  ctx.strokeStyle = gridStyle;
+  ctx.globalAlpha = 0.22;
+  ctx.lineWidth = 1;
+  FILTER_FREQ_TICKS.forEach(({ freq }) => {
+    const x = filterFreqToFrac(freq) * w;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  });
+  ctx.restore();
   ctx.beginPath();
   const points = 64;
   // A canvas always clips its own drawing to its element bounds — it cannot
@@ -264,7 +304,19 @@ function buildFilterModule(engine, onLogged) {
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 90;
   canvas.className = 'filter-curve';
-  module.append(canvas);
+
+  // Freq labels as an HTML overlay, not canvas text: the canvas's internal
+  // 320x90 resolution gets stretched to whatever width the module renders
+  // at, which would stretch drawn text horizontally right along with it.
+  // Percentage-based left offsets stay correct at any width for the same
+  // reason the gridlines do — both come from the identical log-frequency
+  // fraction, just applied in CSS space instead of canvas space.
+  const freqTicks = FILTER_FREQ_TICKS.map(({ freq, label }) =>
+    el('span', 'filter-freq-tick', [label]));
+  freqTicks.forEach((tickEl, i) => {
+    tickEl.style.left = `${filterFreqToFrac(FILTER_FREQ_TICKS[i].freq) * 100}%`;
+  });
+  module.append(el('div', 'filter-curve-wrap', [canvas, ...freqTicks]));
 
   const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ);
 
@@ -780,8 +832,18 @@ function randomPreset() {
 // once. The old code wrote a single entry keyed "preset" — a slot that does
 // not exist — so a preset load left no bubble of its own while silently
 // invalidating the numbers in all the bubbles that were already showing.
+//
+// Only ONE bubble carries the framing sentence ("Loaded X as a starting
+// point...") — Envelope, the first/most prominent panel — since it's the
+// same sentence regardless of which module it sits on. The other five would
+// otherwise all print that identical sentence, six times over, drowning out
+// the one thing that actually differs per panel: the applied value. They get
+// reason:'' instead, which still shows "(now: ...)" with no repeated prose.
+const PRIMARY_ANNOTATION_PARAM = 'envelope';
 function annotatePresetLoad(reason) {
-  MODULE_PARAMS.forEach((param) => addReasoningLogEntry(param, reason));
+  MODULE_PARAMS.forEach((param) => {
+    addReasoningLogEntry(param, param === PRIMARY_ANNOTATION_PARAM ? reason : '');
+  });
 }
 
 function initPresets(engine, uiHandles) {
@@ -962,12 +1024,16 @@ function initPatchCharacter(engine) {
 function renderAnnotation(param) {
   const inline = document.getElementById(`reason-${param}`);
   if (!inline || !annotationEngine) return;
-  const reason = annotationReasons.get(param);
   inline.textContent = '';
-  if (!reason) return;
-  inline.append(document.createTextNode(reason));
+  // Distinguish "no entry at all" (bubble retired, e.g. the user just turned
+  // this knob themselves) from "entry with an empty reason" (part of a
+  // multi-module change whose framing sentence lives on a different panel —
+  // still show the applied value, just no repeated prose).
+  if (!annotationReasons.has(param)) return;
+  const reason = annotationReasons.get(param);
   const applied = describeModule(annotationEngine, param);
-  if (applied) inline.append(el('span', 'applied', [` (now: ${applied})`]));
+  if (reason) inline.append(document.createTextNode(reason));
+  if (applied) inline.append(el('span', 'applied', [reason ? ` (now: ${applied})` : `now: ${applied}`]));
 }
 
 // One suggestion is on screen at a time: a new request clears the bubbles the
@@ -978,15 +1044,20 @@ function clearAllAnnotations() {
   MODULE_PARAMS.forEach((p) => renderAnnotation(p));
 }
 
-// reason set -> the agent explained this module. reason omitted/empty -> the
-// user just moved this knob themselves, which retires the agent's explanation
-// for it rather than leaving stale prose over a value the user has overridden.
+// reason === a string -> show it (possibly '' for "applied value only, no
+// prose" — see annotatePresetLoad). reason === null/undefined -> retire this
+// module's bubble entirely, e.g. the user just turned this knob themselves,
+// which clears whatever explanation used to be there rather than leaving
+// stale prose over a value the user has since overridden.
 function addReasoningLogEntry(parameter, reason) {
+  if (reason == null) {
+    annotationReasons.delete(parameter);
+    renderAnnotation(parameter);
+    return;
+  }
   const grounded = reason ? groundText(reason, annotationEngine) : '';
-  if (grounded) annotationReasons.set(parameter, grounded);
-  else annotationReasons.delete(parameter);
+  annotationReasons.set(parameter, grounded);
   renderAnnotation(parameter);
-  if (!grounded) return;
   const inline = document.getElementById(`reason-${parameter}`);
   if (!inline) return;
   inline.classList.remove('annotation--flash');

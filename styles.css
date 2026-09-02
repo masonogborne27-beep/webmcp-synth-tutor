@@ -35,6 +35,12 @@
   --bevel-pressed:
     inset 0 -1.5px 0 rgba(255, 255, 255, 0.07),
     inset 0 3px 7px rgba(0, 0, 0, 0.75);
+  /* A soft top-lit sheen, layered over a flat panel color as an extra
+     background image — the same physical-surface language the knob caps'
+     radial gradient already established, applied to pills and buttons that
+     were still a single flat fill plus a shadow (dimension from the outline
+     alone, none from the surface itself). */
+  --surface-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%);
   --radius: 10px;
   --radius-lg: 16px;
   --radius-sm: 8px;
@@ -150,8 +156,15 @@ body {
    instrument's hardware faceplates below it. ---------- */
 .agent-panel {
   position: fixed;
+  /* top, not bottom: right:24px always lands in the same column as Delay
+     (row-top) and OSC 3 (row-osc) — the rightmost panel in every row on this
+     page — so a bottom anchor was guaranteed to sit on top of one of them on
+     any viewport shorter than the full page (i.e. almost all of them). The
+     header above row-top is the one strip of the page that isn't a synth
+     module, so anchoring there is the only corner that doesn't start out
+     directly on top of a control surface. */
+  top: 24px;
   right: 24px;
-  bottom: 24px;
   width: 400px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 48px);
@@ -371,7 +384,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--panel-raised);
+  background: var(--surface-gloss), var(--panel-raised);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 999px;
@@ -401,7 +414,7 @@ body {
 
 .surprise-btn {
   margin-left: auto;
-  background: var(--panel-raised);
+  background: var(--surface-gloss), var(--panel-raised);
   border: 1px dashed var(--border);
   color: var(--text);
   border-radius: 999px;
@@ -527,6 +540,24 @@ body {
   gap: 8px;
 }
 
+/* One-word character tag under an oscillator's knobs — "BRIGHT"/"SUB"/
+   "THIN" — the same rule-based "translate the numbers into words" idea as
+   the topbar's overall patch character, scoped to just this oscillator.
+   A small pill rather than plain text so it visually reads as a derived
+   readout, not a fourth label competing with LEVEL/TUNE below the knobs. */
+.osc-character { display: flex; justify-content: center; margin-top: 10px; }
+.osc-character-word {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  background: var(--bg-grid);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
 /* Silkscreened spec line at the foot of a faceplate. Faint and set behind a
    hairline so it reads as printed on the panel, not as content. */
 .module-spec {
@@ -588,7 +619,7 @@ body {
 /* ---------- waveform mini selector ---------- */
 .wave-mini { display: flex; gap: 5px; }
 .wave-mini-btn {
-  background: var(--panel-raised);
+  background: var(--surface-gloss), var(--panel-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-dim);
@@ -598,7 +629,10 @@ body {
   box-shadow: var(--bevel-raised);
   transition: transform 0.08s ease, box-shadow 0.08s ease, color 0.1s ease, border-color 0.1s ease;
 }
-.wave-mini-btn:hover { color: var(--text); }
+/* Was color-only — every other button-like control lifts and brightens its
+   border on hover, this was the one left responding with just a text-color
+   swap. */
+.wave-mini-btn:hover { color: var(--text); border-color: var(--accent-dim); transform: translateY(-1px); }
 .wave-mini-btn:active { transform: translateY(1px); }
 .wave-mini-btn svg { width: 100%; height: 100%; }
 .wave-mini-btn path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
@@ -622,6 +656,10 @@ body {
   transition: filter 0.1s ease;
 }
 .knob-dial.dragging { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) brightness(1.12); }
+/* Was completely silent on hover despite being the single most-used control
+   on the page — a small brightness lift, short of dragging's full boost,
+   signals "this turns" before the user commits to a drag. */
+.knob-dial:hover:not(.dragging) { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)) brightness(1.06); }
 /* Graduated scale: faint minor ticks with brighter majors at both ends and
    centre, so the sweep reads as a measured range rather than a bare circle. */
 .knob-tick { stroke: var(--border); stroke-width: 1.25; stroke-linecap: round; opacity: 0.4; }
@@ -669,6 +707,23 @@ body {
   display: block;
 }
 .osc-viz { margin-bottom: 12px; }
+
+/* Frequency reference labels under the filter curve — sit just below the
+   glass screen rather than inside it, so they never compete with the curve
+   itself. left% is the identical log-frequency fraction the canvas gridline
+   for that same tick is drawn at, so a label always lines up with its line. */
+.filter-curve-wrap { position: relative; }
+.filter-freq-tick {
+  position: absolute;
+  top: 100%;
+  margin-top: 3px;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--text-dim);
+  opacity: 0.65;
+  white-space: nowrap;
+}
 /* Shorter than the other glass screens — a secondary readout, not the
    module's main visual — and given its own top margin since it sits below
    the knob row rather than above it like the others. */
@@ -720,7 +775,9 @@ body {
   box-shadow: var(--bevel-raised);
   transition: transform 0.15s, background 0.15s;
 }
+.toggle:hover .toggle-track { border-color: var(--text-dim); }
 .toggle input:checked + .toggle-track { border-color: var(--accent-dim); }
+.toggle:hover input:checked + .toggle-track { border-color: var(--accent); }
 .toggle input:checked + .toggle-track::after {
   transform: translateX(16px);
   background: radial-gradient(circle at 35% 30%, var(--accent-strong), var(--accent-dim) 85%);
@@ -783,7 +840,7 @@ body {
 .output-scope {
   position: relative;
   width: 100%;
-  background: #0a0a0b;
+  background: var(--bg-grid);
   padding: 12px 26px 8px;
   box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.7), 0 0 70px -14px rgba(94, 234, 212, 0.18);
   overflow: hidden;
@@ -875,6 +932,7 @@ body {
   box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.08);
 }
 .key.white.active { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%); }
+.key.white:hover:not(.active) { background: linear-gradient(180deg, #ffffff 0%, #eaf3ef 100%); }
 .key.black {
   background: linear-gradient(180deg, #262b33 0%, #05070a 100%);
   color: #a9f2e6;
@@ -885,6 +943,7 @@ body {
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
 }
 .key.black.active { background: linear-gradient(180deg, var(--accent-strong) 0%, var(--accent-dim) 100%); }
+.key.black:hover:not(.active) { background: linear-gradient(180deg, #363c46 0%, #10141a 100%); }
 .key .key-qwerty {
   font-family: var(--mono);
   font-size: 9px;

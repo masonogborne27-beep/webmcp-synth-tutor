@@ -1,9 +1,10 @@
 const engine = new SynthEngine();
 
 // A knob the user turned themselves retires the agent's explanation for that
-// module (passing no reason clears it) — the live value beneath it keeps
-// updating either way, via the engine change subscription below.
-const onLogged = (param) => addReasoningLogEntry(param, '');
+// module (null clears it, as opposed to '' which means "show the applied
+// value with no prose" — see addReasoningLogEntry) — the live value beneath
+// it keeps updating either way, via the engine change subscription below.
+const onLogged = (param) => addReasoningLogEntry(param, null);
 const uiHandles = buildSignalPath(engine, onLogged);
 
 buildKeyboardUnit(engine);

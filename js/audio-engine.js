@@ -100,6 +100,23 @@ function describePatchCharacter(engine) {
   return words;
 }
 
+// One word for what a single oscillator is contributing to the mix — the
+// same "translate the numbers into beginner language" idea as
+// describePatchCharacter, scoped to one oscillator's own waveform/tune/level
+// rather than the whole patch.
+function describeOscCharacter(osc) {
+  if (!osc || osc.level <= 0.001) return 'OFF';
+  if (osc.semitone <= -7) return 'SUB';
+  if (osc.semitone >= 12) return 'HIGH';
+  switch (osc.waveform) {
+    case 'sawtooth': return osc.semitone >= 5 ? 'BRIGHT' : 'BUZZY';
+    case 'square': return 'HOLLOW';
+    case 'triangle': return 'SOFT';
+    case 'sine':
+    default: return osc.semitone >= 5 ? 'THIN' : 'PURE';
+  }
+}
+
 // A full readout of every module, used to diff engine state across an agent
 // turn. Diffing actual state is how we know what "changed" — no bookkeeping
 // inside the tools to get out of sync, and a value overwritten later in the
