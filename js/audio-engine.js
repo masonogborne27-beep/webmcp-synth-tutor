@@ -117,6 +117,32 @@ function describeOscCharacter(osc) {
   }
 }
 
+// A full sentence version of the same idea, for the bubble under an
+// oscillator when a preset supplies its values wholesale rather than a model
+// choosing them one at a time — a preset load has no per-oscillator "reason"
+// to show, so without this the bubble was just "(now: sawtooth, level
+// 0.90...)" with no explanation at all. This is the explanation: why THIS
+// waveform, and why THIS tune, in sound-design terms, derived straight from
+// the values themselves rather than from whatever prompted the preset.
+const OSC_WAVEFORM_REASON = {
+  sawtooth: 'A sawtooth brings bright, buzzy harmonics — the classic full-bodied analog color.',
+  square: 'A square wave gives a hollow, reedy edge, with only the odd harmonics present.',
+  triangle: 'A triangle wave stays soft and rounded, with a little more bite than a plain sine.',
+  sine: 'A pure sine tone is clean and simple, with no extra harmonic content to color it.',
+};
+function describeOscReason(osc) {
+  if (!osc || osc.level <= 0.001) return 'Muted for now — not contributing to the mix.';
+  let reason = OSC_WAVEFORM_REASON[osc.waveform] || OSC_WAVEFORM_REASON.sine;
+  if (osc.semitone <= -7) {
+    reason += ' Tuned down an octave or more, it works as a sub-bass layer underneath the rest.';
+  } else if (osc.semitone >= 7) {
+    reason += ' Tuned up, it stacks a higher voice on top for extra fullness.';
+  } else if (osc.semitone !== 0) {
+    reason += ` Nudged ${osc.semitone > 0 ? 'up' : 'down'} slightly, it thickens the tone without changing its register.`;
+  }
+  return reason;
+}
+
 // A full readout of every module, used to diff engine state across an agent
 // turn. Diffing actual state is how we know what "changed" — no bookkeeping
 // inside the tools to get out of sync, and a value overwritten later in the

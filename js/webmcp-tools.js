@@ -214,7 +214,7 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         // only a cutoff here is what let the model keep talking about a preset's
         // headline number while the rest of the patch had moved on.
         const presetReason = reason || `Loaded the "${preset.name}" preset as a starting point.`;
-        annotatePresetLoad(presetReason);
+        annotatePresetLoad(engine, presetReason);
         const applied = MODULE_PARAMS
           .map((p) => `${MODULE_LABELS[p]} — ${describeModule(engine, p)}`)
           .join('; ');

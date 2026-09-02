@@ -835,14 +835,28 @@ function randomPreset() {
 //
 // Only ONE bubble carries the framing sentence ("Loaded X as a starting
 // point...") — Envelope, the first/most prominent panel — since it's the
-// same sentence regardless of which module it sits on. The other five would
-// otherwise all print that identical sentence, six times over, drowning out
-// the one thing that actually differs per panel: the applied value. They get
-// reason:'' instead, which still shows "(now: ...)" with no repeated prose.
+// same sentence regardless of which module it sits on. Filter/Effect get
+// reason:'' (just "(now: ...)", no repeated prose) since a preset gives no
+// per-parameter reasoning for them to show.
+//
+// Oscillators are the exception: a preset choosing "sawtooth, -12 st" IS a
+// real, explainable sound-design choice (a sub-bass layer, a bright lead...)
+// even though no model is in the loop narrating it for this particular
+// change. describeOscReason derives that explanation straight from the
+// values themselves, so oscillator bubbles say why that waveform/tune
+// combination was worth picking, not just "(now: sawtooth, level 0.90...)"
+// with nothing behind it.
 const PRIMARY_ANNOTATION_PARAM = 'envelope';
-function annotatePresetLoad(reason) {
+function annotatePresetLoad(engine, reason) {
   MODULE_PARAMS.forEach((param) => {
-    addReasoningLogEntry(param, param === PRIMARY_ANNOTATION_PARAM ? reason : '');
+    if (param === PRIMARY_ANNOTATION_PARAM) {
+      addReasoningLogEntry(param, reason);
+    } else if (param.startsWith('oscillator-')) {
+      const index = Number(param.slice('oscillator-'.length));
+      addReasoningLogEntry(param, describeOscReason(engine.oscillators[index]));
+    } else {
+      addReasoningLogEntry(param, '');
+    }
   });
 }
 
@@ -853,7 +867,7 @@ function initPresets(engine, uiHandles) {
     card.addEventListener('click', () => {
       engine.loadPreset(preset);
       applyPresetToUI(preset, uiHandles);
-      annotatePresetLoad(`Loaded "${preset.name}" as a starting point — tweak any knob from here.`);
+      annotatePresetLoad(engine, `Loaded "${preset.name}" as a starting point — tweak any knob from here.`);
     });
     container.append(card);
   });
