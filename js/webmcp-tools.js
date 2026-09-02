@@ -151,6 +151,9 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ attack, decay, sustain, release, reason }) => {
         engine.setEnvelope({ attack, decay, sustain, release });
         envelopeUI.setState({ attack, decay, sustain, release });
+        // Demonstrate the new shape rather than just redrawing it: the
+        // playhead walks the curve while the note sounds.
+        engine.auditionNote();
         const applied = report('envelope', reason);
         logCall('set_envelope', { attack, decay, sustain, release, reason }, applied);
         return `Envelope is now: ${applied}.`;
@@ -203,6 +206,9 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         if (!preset) return `Unknown preset: ${presetId}`;
         engine.loadPreset(preset);
         applyPresetToUI(preset, { oscUIs, filterUI, envelopeUI, effectUI });
+        // Demonstrate the resulting envelope shape, same as a manually
+        // triggered set_envelope — a preset changes it just as much.
+        engine.auditionNote();
         // A preset replaces every module, so it annotates every module — and
         // the result handed back to the model spells out all of them. Reporting
         // only a cutoff here is what let the model keep talking about a preset's
@@ -230,7 +236,13 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         },
         required: ['parameter'],
       },
-      execute: async ({ parameter }) => PARAM_EXPLANATIONS[parameter] || 'Unknown parameter.',
+      execute: async ({ parameter }) => {
+        // Asking "what does the envelope do" is exactly when watching the
+        // current shape play out is most useful — demonstrate it live
+        // rather than only describing it in prose.
+        if (parameter === 'envelope') engine.auditionNote();
+        return PARAM_EXPLANATIONS[parameter] || 'Unknown parameter.';
+      },
     },
   ];
 }

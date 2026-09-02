@@ -319,6 +319,20 @@ class SynthEngine {
     this._notifyNote('on');
   }
 
+  // Play a short note on the synth's own initiative, so an agent-driven
+  // change demonstrates itself: same noteOn/noteOff path a key press takes,
+  // so the scope and the envelope playhead both respond exactly as usual.
+  // Held long enough to show attack and decay land and the plateau begin,
+  // then released so the tail is shown too — capped so a very slow attack
+  // doesn't leave a note ringing.
+  auditionNote(freq = NOTE_FREQS.C4) {
+    const { attack, decay } = this.envelope;
+    const hold = Math.min(attack + decay + 0.9, 2.5);
+    clearTimeout(this._auditionTimer);
+    this.noteOn(freq);
+    this._auditionTimer = setTimeout(() => this.noteOff(), hold * 1000);
+  }
+
   noteOff() {
     if (!this.activeVoice || !this.ctx) return;
     const { voices, mixNode, envGain } = this.activeVoice;

@@ -331,37 +331,6 @@ function drawEnvelopeViz(svg, env) {
   return g;
 }
 
-// Stage names printed along the bottom of the graph, each centred under the
-// segment it belongs to. Rendered as HTML rather than SVG <text>: the graph
-// stretches with preserveAspectRatio="none", which would squash type.
-// A segment too narrow to hold its own name is left unlabelled instead of
-// letting a fast attack overprint the decay beside it.
-const ENV_STAGES = ['Attack', 'Decay', 'Sustain', 'Release'];
-
-// A label is shown only if the text actually fits inside its own segment.
-// Measuring beats a percentage threshold here: the same 12%-wide segment
-// holds "DECAY" comfortably on a wide panel and not at all on a narrow one,
-// so the cutoff has to be in pixels, against the rendered text.
-function layoutEnvelopeStages(stageEls, g, pixelWidth) {
-  const bounds = [[0, g.x1], [g.x1, g.x2], [g.x2, g.sustainEnd], [g.sustainEnd, g.x3]];
-  stageEls.forEach((elem, i) => {
-    const [from, to] = bounds[i];
-    elem.style.left = `${((from + to) / 2 / g.w) * 100}%`;
-    elem.style.visibility = 'visible';
-  });
-  if (!pixelWidth) return;
-  stageEls.forEach((elem, i) => {
-    const [from, to] = bounds[i];
-    const segmentPx = ((to - from) / g.w) * pixelWidth;
-    elem.style.visibility = elem.offsetWidth + 6 <= segmentPx ? 'visible' : 'hidden';
-    // Centre-on-segment would let the last label hang off the right edge, so
-    // nudge it back inside by its own half-width.
-    const halfPct = (elem.offsetWidth / 2 / pixelWidth) * 100;
-    const centrePct = ((from + to) / 2 / g.w) * 100;
-    elem.style.left = `${clamp(centrePct, halfPct + 1.5, 100 - halfPct - 1.5)}%`;
-  });
-}
-
 function buildEnvelopeModule(engine, onLogged) {
   const module = el('section', 'module module--envelope');
   module.append(moduleTitle('Envelope'));
@@ -385,18 +354,9 @@ function buildEnvelopeModule(engine, onLogged) {
   const playDot = svgEl('circle', { class: 'env-playhead-dot', cx: 0, cy: 0, r: 4 });
   svg.append(playLine, playDot);
 
-  const stageEls = ENV_STAGES.map((name) => el('span', 'env-stage', [name]));
-  const stageLayer = el('div', 'env-stages', stageEls);
-  const vizWrap = el('div', 'envelope-viz-wrap', [svg, stageLayer]);
-
   const state = { ...engine.envelope };
   let geometry = envelopeGeometry(state);
-  const redraw = () => {
-    geometry = drawEnvelopeViz(svg, state);
-    layoutEnvelopeStages(stageEls, geometry, svg.getBoundingClientRect().width);
-  };
-  // Which labels fit depends on how wide the panel is, so re-test on resize.
-  if (window.ResizeObserver) new ResizeObserver(() => redraw()).observe(vizWrap);
+  const redraw = () => { geometry = drawEnvelopeViz(svg, state); };
 
   const specs = [
     ['attack', 'Attack', 0, 3, (v) => `${v.toFixed(2)}s`, '0', '3s'],
@@ -499,7 +459,7 @@ function buildEnvelopeModule(engine, onLogged) {
 
   // Graph on the left half, the 4 knobs as a 2x2 grid on the right half.
   const knobGrid = el('div', 'knob-grid', knobEls);
-  module.append(el('div', 'envelope-body', [vizWrap, knobGrid]));
+  module.append(el('div', 'envelope-body', [svg, knobGrid]));
   module.append(moduleSpec('ADSR · LINEAR'));
   module.append(annotationSlot('envelope'));
   redraw();
