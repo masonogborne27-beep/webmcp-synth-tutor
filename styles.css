@@ -5,7 +5,12 @@
      raw gaps to look like equal perceptual steps (gamma/low-light contrast
      sensitivity isn't linear). This ramp roughly follows Tailwind's zinc
      900/700/600/500/400 — a much bigger, unambiguous jump at every step. */
-  --bg: #0c0c0e;
+  /* Lighter grey, not near-black — kept below --panel-sunken (#2f2f34) so
+     the sunken/recessed surfaces still read as darker than the page behind
+     them. --bg-grid stays near-black on purpose: it's the "digital display"
+     zones (Output scope, agent chat, filter/osc canvases), a deliberately
+     different, darker material from the page background itself. */
+  --bg: #232327;
   --bg-grid: #08080a;
   --panel: #52525b;
   --panel-raised: #71717a;
