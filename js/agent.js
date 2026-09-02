@@ -28,17 +28,25 @@ const SYSTEM_TEXT =
   'the user\'s request (which may be vague or purely emotional/descriptive) into specific ' +
   'tool calls using the mappings described in each tool\'s own description. For a broad or ' +
   'vague request, prefer calling load_preset first to get close quickly, then fine-tune with ' +
-  'the other tools only if useful. For every tool call that changes a parameter, always ' +
-  'include a short, plain-language "reason" written for a beginner, and that reason must ' +
-  'describe the exact numeric values you are passing in that same call — never mention a ' +
-  'different number than the one in the call\'s own arguments. After you are done making ' +
-  'changes, each function result tells you the real, final value of every parameter it ' +
-  'touched — you must always send a short, warm, non-technical final reply summarizing what ' +
-  'changed (1-3 sentences), and that reply must stay strictly consistent with those returned ' +
-  'values (e.g. if a result says "resonance 2.0", do not describe it as heavily resonant or ' +
-  'give a different number) — never stop after only calling functions with no reply text, and ' +
-  'never describe a value you did not actually set. If the user asks a pure question with no ' +
-  'change to make, use explain_parameter and relay its answer conversationally.';
+  'the other tools only if useful. Note that load_preset replaces every parameter, so never ' +
+  'call it after the individual set_* tools in the same turn — it would discard those edits. ' +
+  'For every tool call that changes a parameter, always include a short, plain-language ' +
+  '"reason" written for a beginner. ' +
+  'IMPORTANT — do not write specific numbers or preset names in your "reason" text or in your ' +
+  'final reply. The interface displays the real, final value of every parameter next to your ' +
+  'words automatically, straight from the synth itself. Your job is the qualitative "why" ' +
+  '("opened the filter up so it cuts through", "shortened the release so notes stop dead"); ' +
+  'the numbers are supplied for you, and any you write yourself will be removed. ' +
+  'You must always finish with a short, warm, non-technical reply (1-3 sentences) describing ' +
+  'the character of the change — never stop after only calling functions with no reply text. ' +
+  'If the user asks a pure question with no change to make, use explain_parameter and relay ' +
+  'its answer conversationally.';
+
+// Flip to false to silence the per-stage pipeline trace in the console.
+window.SIGNAL_PATH_DEBUG = window.SIGNAL_PATH_DEBUG ?? true;
+function agentDebug(stage, payload) {
+  if (window.SIGNAL_PATH_DEBUG) console.log(`[${stage}]`, payload);
+}
 
 // ---- Shared provider (default, no key needed) ----
 const SharedProvider = {
@@ -252,9 +260,10 @@ const ClaudeProvider = {
 const PROVIDERS = { shared: SharedProvider, gemini: GeminiProvider, claude: ClaudeProvider };
 
 class Agent {
-  constructor(toolDefs, provider) {
+  constructor(toolDefs, provider, engine) {
     this.toolDefs = toolDefs;
     this.toolMap = Object.fromEntries(toolDefs.map((t) => [t.name, t]));
+    this.engine = engine;
     this.setProvider(provider);
   }
 
@@ -279,10 +288,18 @@ class Agent {
     const declarations = provider.toDeclarations(this.toolDefs);
     provider.appendUserText(this.history, userText);
 
+    // The whole turn is bracketed by a state snapshot. Whatever differs at the
+    // end is, by construction, what the audio nodes actually ended up at — so
+    // the summary shown to the user is read off the instrument, not assembled
+    // from the model's account of what it did.
+    const before = snapshotState(this.engine);
+    agentDebug('0/4 turn start', { userText, stateBefore: before });
+
+    let prose = '';
     for (let round = 0; round < 4; round++) {
       onStatus?.('thinking');
       const { functionCalls, textReply } = await provider.requestTurn(this.history, model, apiKey, declarations);
-      if (!functionCalls.length) return textReply;
+      if (!functionCalls.length) { prose = textReply; break; }
 
       onStatus?.(`calling ${functionCalls.map((c) => c.name).join(', ')}`);
       const resultsByCall = [];
@@ -294,18 +311,44 @@ class Agent {
         } catch (err) {
           resultText = `Error running ${call.name}: ${err.message}`;
         }
-        console.debug(`[agent:${provider.id}] ${call.name}`, { rawArgs: call.args, resultText });
+        agentDebug(`2/4 tool result  ${call.name}`, { rawArgs: call.args, returnedToModel: resultText });
         resultsByCall.push({ ...call, resultText });
       }
       provider.appendFunctionResults(this.history, resultsByCall);
     }
-    return 'Made several changes — check the reasoning log below for the full breakdown.';
+
+    const after = snapshotState(this.engine);
+    const changed = MODULE_PARAMS
+      .filter((p) => before[p] !== after[p])
+      .map((p) => ({ param: p, label: MODULE_LABELS[p], value: after[p] }));
+
+    agentDebug('3/4 model prose (raw)', { prose });
+    const grounded = groundText(prose, this.engine);
+    agentDebug('4/4 shown to user', { prose: grounded, appliedFromEngine: changed });
+
+    return {
+      text: grounded || (changed.length ? 'Here\'s what I changed:' : '(no reply text)'),
+      changed,
+    };
   }
 }
 
-function appendChatMessage(role, text) {
+function appendChatMessage(role, text, changed) {
   const log = document.getElementById('agent-log');
   const msg = el('div', `agent-msg agent-msg--${role}`, [text]);
+  // The numbers in the reply are rendered here, from the diff of real engine
+  // state — the same values describeModule() puts in the knob bubbles. The
+  // model's prose above them carries no numbers of its own to disagree with.
+  if (changed && changed.length) {
+    const list = el('div', 'agent-applied');
+    changed.forEach(({ label, value }) => {
+      list.append(el('div', 'agent-applied-row', [
+        el('span', 'agent-applied-label', [label]),
+        el('span', 'agent-applied-value', [value]),
+      ]));
+    });
+    msg.append(list);
+  }
   log.append(msg);
   log.scrollTop = log.scrollHeight;
   return msg;
@@ -366,14 +409,14 @@ function makeDraggable(panel, handle) {
 // anyone reading the code, but the UI only ever drives Shared now — the
 // dropdown and key-entry controls were cut as demo clutter once the shared
 // backend made them unnecessary for the default experience.
-function initAgentPanel(toolDefs) {
+function initAgentPanel(toolDefs, engine) {
   makeDraggable(document.querySelector('.agent-panel'), document.querySelector('.agent-header'));
 
   const form = document.getElementById('agent-form');
   const input = document.getElementById('agent-input');
   const sendBtn = document.getElementById('agent-send');
 
-  const agent = new Agent(toolDefs, PROVIDERS.shared);
+  const agent = new Agent(toolDefs, PROVIDERS.shared, engine);
 
   let busy = false;
   form.addEventListener('submit', async (e) => {
@@ -392,7 +435,7 @@ function initAgentPanel(toolDefs) {
         onStatus: (s) => { statusMsg.textContent = s === 'thinking' ? 'Thinking…' : `Turning knobs (${s})…`; },
       });
       statusMsg.remove();
-      appendChatMessage('agent', reply);
+      appendChatMessage('agent', reply.text, reply.changed);
     } catch (err) {
       statusMsg.remove();
       appendChatMessage('error', err.message || 'Something went wrong talking to the agent.');

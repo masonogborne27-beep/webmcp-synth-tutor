@@ -187,6 +187,31 @@ body {
   color: var(--text);
   border-bottom-left-radius: 4px;
 }
+/* The numbers in an agent reply — read straight off the engine after the
+   turn, never written by the model. Set apart from the prose above them so
+   it's obvious which part is the instrument talking. */
+.agent-applied {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 180, 84, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.agent-applied-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.agent-applied-label {
+  flex: 0 0 62px;
+  color: var(--amber);
+  letter-spacing: 0.04em;
+}
+.agent-applied-value { color: var(--text); }
+
 .agent-msg--status {
   align-self: flex-start;
   color: var(--text-dim);

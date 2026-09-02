@@ -47,19 +47,20 @@ const REASON_FIELD = {
 // Returns the tool definitions as plain data + execute functions, independent
 // of WebMCP. Both registerWebMcpTools() and the Agent panel consume this.
 function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
-  // "applied" is always read back from live engine state AFTER the change is
-  // made — never from the LLM's own args — so the number shown next to the
-  // model's prose explanation is provably the same value that was actually
-  // set, not a second, independently-generated value that can drift from it.
-  const withReason = (parameter, reason, applied) => {
-    if (reason) addReasoningLogEntry(parameter, reason, applied);
+  // Every number a tool reports — to the bubble, and back to the model as the
+  // function result that shapes its reply — comes from describeModule() reading
+  // live engine state after the change. The tool never formats a value from its
+  // own arguments, so there is no second number that could disagree.
+  const report = (parameter, reason) => {
+    if (reason) addReasoningLogEntry(parameter, reason);
+    return describeModule(engine, parameter);
   };
 
-  // Every tool call is logged with its raw args exactly as the LLM sent them,
-  // so a mismatch between what the model *said* and what it *sent* is
-  // verifiable from devtools rather than taken on faith.
+  // Stage 1 of the pipeline trace: the raw arguments the LLM actually sent,
+  // beside the state that actually resulted. Any divergence between what the
+  // model says and what it sent is visible here rather than taken on faith.
   const logCall = (name, args, applied) => {
-    console.debug(`[tool call] ${name}`, { args, applied });
+    if (window.SIGNAL_PATH_DEBUG) console.log(`[1/4 tool args] ${name}`, { rawArgs: args, appliedState: applied });
   };
 
   return [
@@ -94,9 +95,7 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         const index = oscillator - 1;
         engine.setOscillator(index, { waveform, level, detune, semitone });
         oscUIs[index].setState({ waveform, level, semitone });
-        const o = engine.oscillators[index];
-        const applied = `${o.waveform}, level ${o.level.toFixed(2)}, tune ${o.semitone >= 0 ? '+' : ''}${o.semitone} st, detune ${o.detune}¢`;
-        withReason(`oscillator-${index}`, reason, applied);
+        const applied = report(`oscillator-${index}`, reason);
         logCall('set_oscillator', { oscillator, waveform, level, detune, semitone, reason }, applied);
         return `Oscillator ${oscillator} is now: ${applied}.`;
       },
@@ -123,8 +122,7 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ cutoff, resonance, reason }) => {
         engine.setFilter({ cutoff, resonance });
         filterUI.setState({ cutoff, resonance });
-        const applied = `cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}`;
-        withReason('filter', reason, applied);
+        const applied = report('filter', reason);
         logCall('set_filter', { cutoff, resonance, reason }, applied);
         return `Filter is now: ${applied}.`;
       },
@@ -153,9 +151,7 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ attack, decay, sustain, release, reason }) => {
         engine.setEnvelope({ attack, decay, sustain, release });
         envelopeUI.setState({ attack, decay, sustain, release });
-        const e = engine.envelope;
-        const applied = `attack ${e.attack.toFixed(2)}s, decay ${e.decay.toFixed(2)}s, sustain ${e.sustain.toFixed(2)}, release ${e.release.toFixed(2)}s`;
-        withReason('envelope', reason, applied);
+        const applied = report('envelope', reason);
         logCall('set_envelope', { attack, decay, sustain, release, reason }, applied);
         return `Envelope is now: ${applied}.`;
       },
@@ -180,8 +176,7 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       execute: async ({ enabled, mix, reason }) => {
         engine.setEffect({ enabled, mix });
         effectUI.setState({ enabled, mix });
-        const applied = `${engine.effect.enabled ? 'on' : 'off'}, mix ${engine.effect.mix.toFixed(2)}`;
-        withReason('effect', reason, applied);
+        const applied = report('effect', reason);
         logCall('set_effect', { enabled, mix, reason }, applied);
         return `Delay is now: ${applied}.`;
       },
@@ -208,10 +203,17 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         if (!preset) return `Unknown preset: ${presetId}`;
         engine.loadPreset(preset);
         applyPresetToUI(preset, { oscUIs, filterUI, envelopeUI, effectUI });
-        const applied = `"${preset.name}" — cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}, delay ${engine.effect.enabled ? 'on' : 'off'}`;
-        withReason('preset', reason || `Loaded the "${preset.name}" preset as a starting point.`, applied);
+        // A preset replaces every module, so it annotates every module — and
+        // the result handed back to the model spells out all of them. Reporting
+        // only a cutoff here is what let the model keep talking about a preset's
+        // headline number while the rest of the patch had moved on.
+        const presetReason = reason || `Loaded the "${preset.name}" preset as a starting point.`;
+        annotatePresetLoad(presetReason);
+        const applied = MODULE_PARAMS
+          .map((p) => `${MODULE_LABELS[p]} — ${describeModule(engine, p)}`)
+          .join('; ');
         logCall('load_preset', { preset: presetId, reason }, applied);
-        return `Loaded preset ${applied}.`;
+        return `Loaded preset "${preset.name}". Full resulting patch: ${applied}.`;
       },
     },
     {

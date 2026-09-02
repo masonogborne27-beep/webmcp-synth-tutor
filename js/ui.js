@@ -571,6 +571,14 @@ function randomPreset() {
   };
 }
 
+// A preset rewrites every module at once, so it must annotate every module at
+// once. The old code wrote a single entry keyed "preset" — a slot that does
+// not exist — so a preset load left no bubble of its own while silently
+// invalidating the numbers in all the bubbles that were already showing.
+function annotatePresetLoad(reason) {
+  MODULE_PARAMS.forEach((param) => addReasoningLogEntry(param, reason));
+}
+
 function initPresets(engine, uiHandles) {
   const container = document.getElementById('presets');
   PRESETS.forEach((preset, i) => {
@@ -578,7 +586,7 @@ function initPresets(engine, uiHandles) {
     card.addEventListener('click', () => {
       engine.loadPreset(preset);
       applyPresetToUI(preset, uiHandles);
-      addReasoningLogEntry('preset', `Loaded "${preset.name}" as a starting point — tweak any knob from here.`);
+      annotatePresetLoad(`Loaded "${preset.name}" as a starting point — tweak any knob from here.`);
     });
     container.append(card);
   });
@@ -587,25 +595,76 @@ function initPresets(engine, uiHandles) {
     const preset = randomPreset();
     engine.loadPreset(preset);
     applyPresetToUI(preset, uiHandles);
-    addReasoningLogEntry('preset', 'Randomized every parameter — see what stuck and refine from here.');
+    annotatePresetLoad('Randomized every parameter — see what stuck and refine from here.');
   });
 }
 
+// ---- grounding: no model-written number ever reaches the screen ----
+// The model is told to describe changes qualitatively and let the UI supply
+// the numbers. These strip any it writes anyway, so a hallucinated "6500 Hz"
+// can never end up sitting next to the real 1400 Hz. Both the annotation
+// prose and the chat reply go through here; the true values are appended
+// separately, straight from describeModule(engine, ...).
+
+// A bare number carrying a unit ("to 3500 Hz", "0.25s", "8 semitones").
+const NUMERIC_CLAIM_RE =
+  /\s*\b(?:to|at|around|about|near|of|roughly)?\s*~?\d+(?:[.,]\d+)?\s*(?:hz|khz|db|%|ms|sec(?:onds?)?|semitones?|cents?|s\b|st\b)/gi;
+// A parameter named with a number but no unit ("resonance to 8", "mix 0.4").
+const PARAM_NUMBER_RE =
+  /\b(cutoff|resonance|attack|decay|sustain|release|level|mix|detune|tune)\b\s*(?:to|at|of|=)?\s*~?\d+(?:[.,]\d+)?/gi;
+
+function groundText(text, engine) {
+  if (!text) return text;
+  let out = text;
+  // A preset the model names must be the one actually loaded, or not named.
+  PRESETS.forEach((p) => {
+    if (p.name === engine?.lastPresetName) return;
+    out = out.split(p.name).join(engine?.lastPresetName || 'a preset');
+  });
+  out = out.replace(NUMERIC_CLAIM_RE, '');
+  out = out.replace(PARAM_NUMBER_RE, '$1');
+  // Tidy the punctuation left behind by a removed clause.
+  return out.replace(/\s+([,.;!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+}
+
 // ---- inline speech-bubble annotations ----
-// `applied` is a deterministic summary read back from live engine state — see
-// webmcp-tools.js — always shown alongside the model's own `reason` prose so
-// a viewer can catch it directly if the two ever disagree, rather than
-// silently trusting the model's explanation as ground truth.
-// The speech-bubble pinned to the changed module is the only place this
-// reasoning appears now (there is no separate running log) — see the design
-// brief this was built against for why that consolidation happened.
-function addReasoningLogEntry(parameter, reason, applied) {
+// A bubble stores only the model's prose. Its numbers are re-derived from live
+// engine state every time that module changes — from any source: a later tool
+// call in the same turn, a preset load that overwrites everything, or the user
+// turning the knob by hand. Nothing is cached, so a bubble cannot drift away
+// from the knob beneath it. (It used to bake the value in at execute time,
+// which is exactly how a bubble reading 3500 Hz ended up over a 1400 Hz knob.)
+const annotationReasons = new Map();
+let annotationEngine = null;
+
+function initAnnotations(engine) {
+  annotationEngine = engine;
+  engine.onChange((param) => renderAnnotation(param));
+  MODULE_PARAMS.forEach((p) => renderAnnotation(p));
+}
+
+function renderAnnotation(param) {
+  const inline = document.getElementById(`reason-${param}`);
+  if (!inline || !annotationEngine) return;
+  const reason = annotationReasons.get(param);
+  inline.textContent = '';
   if (!reason) return;
+  inline.append(document.createTextNode(reason));
+  const applied = describeModule(annotationEngine, param);
+  if (applied) inline.append(el('span', 'applied', [` (now: ${applied})`]));
+}
+
+// reason set -> the agent explained this module. reason omitted/empty -> the
+// user just moved this knob themselves, which retires the agent's explanation
+// for it rather than leaving stale prose over a value the user has overridden.
+function addReasoningLogEntry(parameter, reason) {
+  const grounded = reason ? groundText(reason, annotationEngine) : '';
+  if (grounded) annotationReasons.set(parameter, grounded);
+  else annotationReasons.delete(parameter);
+  renderAnnotation(parameter);
+  if (!grounded) return;
   const inline = document.getElementById(`reason-${parameter}`);
   if (!inline) return;
-  inline.textContent = '';
-  inline.append(document.createTextNode(reason));
-  if (applied) inline.append(el('span', 'applied', [` (set: ${applied})`]));
   inline.classList.remove('annotation--flash');
   void inline.offsetWidth;
   inline.classList.add('annotation--flash');

@@ -18,6 +18,53 @@ const DEFAULT_OSCILLATORS = [
   { waveform: 'sine', level: 0, detune: 0, semitone: -12 },
 ];
 
+// The canonical list of things that can carry a value, an annotation bubble,
+// and a line in the agent's reply. Keyed the same everywhere.
+const MODULE_PARAMS = ['oscillator-0', 'oscillator-1', 'oscillator-2', 'filter', 'envelope', 'effect'];
+const MODULE_LABELS = {
+  'oscillator-0': 'OSC 1',
+  'oscillator-1': 'OSC 2',
+  'oscillator-2': 'OSC 3',
+  filter: 'Filter',
+  envelope: 'Envelope',
+  effect: 'Delay',
+};
+
+// THE single place engine state becomes a human-readable number string.
+// Every number the user can see — annotation bubbles, the agent's chat reply,
+// tool return values fed back to the model — is produced by this function
+// reading live engine state at the moment of rendering. Nothing caches a
+// formatted value, so nothing can survive past the state it described.
+function describeModule(engine, param) {
+  if (param.startsWith('oscillator-')) {
+    const osc = engine.oscillators[Number(param.slice('oscillator-'.length))];
+    if (!osc) return '';
+    if (osc.level <= 0.001) return 'off (level 0.00)';
+    const tune = `${osc.semitone >= 0 ? '+' : ''}${osc.semitone}`;
+    return `${osc.waveform}, level ${osc.level.toFixed(2)}, tune ${tune} st, detune ${osc.detune}¢`;
+  }
+  if (param === 'filter') {
+    return `cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}`;
+  }
+  if (param === 'envelope') {
+    const e = engine.envelope;
+    return `attack ${e.attack.toFixed(2)}s, decay ${e.decay.toFixed(2)}s, ` +
+      `sustain ${e.sustain.toFixed(2)}, release ${e.release.toFixed(2)}s`;
+  }
+  if (param === 'effect') {
+    return `${engine.effect.enabled ? 'on' : 'off'}, mix ${engine.effect.mix.toFixed(2)}`;
+  }
+  return '';
+}
+
+// A full readout of every module, used to diff engine state across an agent
+// turn. Diffing actual state is how we know what "changed" — no bookkeeping
+// inside the tools to get out of sync, and a value overwritten later in the
+// turn contributes only its final form.
+function snapshotState(engine) {
+  return Object.fromEntries(MODULE_PARAMS.map((p) => [p, describeModule(engine, p)]));
+}
+
 class SynthEngine {
   constructor() {
     this.ctx = null;
@@ -27,6 +74,25 @@ class SynthEngine {
     this.envelope = { attack: 0.02, decay: 0.15, sustain: 0.6, release: 0.3 };
     this.effect = { enabled: false, mix: 0.3 };
     this.activeVoice = null;
+    // Name of the last preset actually loaded, so a reply that names a preset
+    // can be checked against the one that really got applied.
+    this.lastPresetName = null;
+    this._changeListeners = [];
+  }
+
+  // Any mutation announces which module it touched. Annotation bubbles
+  // subscribe to this and re-derive their numbers, so a bubble written by an
+  // earlier tool call cannot keep displaying a value that a later call, a
+  // preset load, or a knob turn has since replaced.
+  onChange(fn) {
+    this._changeListeners.push(fn);
+    return () => {
+      this._changeListeners = this._changeListeners.filter((f) => f !== fn);
+    };
+  }
+
+  _notifyChange(param) {
+    this._changeListeners.forEach((fn) => fn(param));
   }
 
   // Audio context must be created/resumed from a user gesture.
@@ -107,6 +173,7 @@ class SynthEngine {
         );
       }
     }
+    this._notifyChange(`oscillator-${index}`);
   }
 
   setFilter({ cutoff, resonance } = {}) {
@@ -122,6 +189,7 @@ class SynthEngine {
         this.filterNode.Q.setTargetAtTime(resonance, this.ctx.currentTime, 0.01);
       }
     }
+    this._notifyChange('filter');
   }
 
   setEnvelope({ attack, decay, sustain, release } = {}) {
@@ -129,6 +197,7 @@ class SynthEngine {
     if (decay != null) this.envelope.decay = decay;
     if (sustain != null) this.envelope.sustain = sustain;
     if (release != null) this.envelope.release = release;
+    this._notifyChange('envelope');
   }
 
   setEffect({ enabled, mix } = {}) {
@@ -138,12 +207,18 @@ class SynthEngine {
       const target = this.effect.enabled ? this.effect.mix : 0;
       this.wetGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.02);
     }
+    this._notifyChange('effect');
   }
 
   loadPreset(preset) {
+    this.lastPresetName = preset.name || null;
     if (preset.oscillators) {
       preset.oscillators.forEach((o, i) => this.setOscillator(i, o));
       this.oscillators = preset.oscillators.map((o) => ({ ...o }));
+      // setOscillator ran against the pre-replacement array above; re-announce
+      // now that this.oscillators holds the preset's real values, or listeners
+      // would read one-change-behind state.
+      preset.oscillators.forEach((o, i) => this._notifyChange(`oscillator-${i}`));
     }
     if (preset.filter) this.setFilter(preset.filter);
     if (preset.envelope) this.setEnvelope(preset.envelope);
