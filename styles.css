@@ -436,6 +436,14 @@ body {
    Envelope, which actually has four knobs and a graph to show. */
 .row-top .module--effect { flex: 0 0 176px; }
 .row-top .module--envelope { flex: 2 1 300px; }
+/* Envelope + Filter + Delay must stay one row, never wrap to a second line —
+   each module's own min-width (176px) is what let them wrap onto separate
+   flex lines once the row got narrower than their combined minimum (~560px,
+   e.g. with devtools docked open), which is what actually produced
+   "misaligned top edges": Delay wasn't misaligned, it was on a different
+   row entirely. nowrap makes that structurally impossible; only a viewport
+   narrower than the three panels' hard floor can still overflow. */
+.row-top { flex-wrap: nowrap; }
 
 /* Hardware faceplate: tighter corners than a software card, a beveled edge
    (inset highlight + shadow), and a faint seam line near the top — like a
@@ -505,7 +513,11 @@ body {
   box-shadow: var(--bevel-pressed), 0 0 8px rgba(94, 234, 212, 0.65);
 }
 
-.knob-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+/* justify-content:center: without it a knob-row (Filter's Cutoff/Resonance,
+   Delay's single Mix knob) defaults to flex-start and sits pinned to the
+   left edge of the full module width, leaving a large empty gap on the
+   right instead of reading as centered under whatever's drawn above it. */
+.knob-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
 
 /* Envelope: graph fills the left half, its 4 knobs sit as a 2x2 grid on
    the right instead of a single row, so the module doesn't get too wide.
@@ -518,7 +530,10 @@ body {
   flex: 1 1 50%;
   display: grid;
   grid-template-columns: repeat(2, auto);
-  gap: 10px 18px;
+  /* Same 12px rhythm as .knob-row's gap, so the two-knob Filter row and the
+     four-knob Envelope grid read as one consistent spacing system rather
+     than two different values that happen to look similar. */
+  gap: 12px;
   justify-content: center;
   align-content: center;
 }
