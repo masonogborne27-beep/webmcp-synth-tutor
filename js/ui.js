@@ -385,14 +385,27 @@ function buildEnvelopeModule(engine, onLogged) {
   // in step with what you're hearing. Driven by the same note trigger that
   // starts the audio, so the two cannot fall out of sync.
   //
+  // walkPosition() is the ONE function that places a point on the curve
+  // before release, and it is built from exactly the same breakpoints
+  // drawEnvelopeViz() draws (g.x1/x2/sustainEnd, g.peakY/sustainY/floor) — not
+  // a second, independent formula that happens to produce similar numbers.
+  // The release phase below reuses its output as the start of the release
+  // lerp rather than computing its own "current" position, which is what
+  // previously let a note released mid-attack or mid-decay draw a straight
+  // diagonal from wherever it was to the bottom-right corner: audio-accurate,
+  // but nowhere the drawn curve actually goes.
+  //
   // The plateau is the one part real time can't be mapped onto directly —
   // the graph draws a fixed-width hold, but a key can be held indefinitely.
-  // The playhead crosses it over HOLD_TRAVERSE_S and then parks at its end,
-  // which reads correctly: it has arrived at sustain and is staying there.
+  // The playhead crosses it over HOLD_TRAVERSE_S and then parks at its end.
+  // An early release doesn't skip this: the pointer keeps tracing the
+  // already-drawn attack/decay/hold shape at its normal pace and only starts
+  // the release segment once it naturally reaches the hold's end — so the
+  // dot is always sitting somewhere on the visible line, never off it.
   const HOLD_TRAVERSE_S = 0.9;
   let noteStart = 0;
-  let releaseStart = 0;
-  let releaseFrom = null;
+  let released = false;
+  let keyUpAt = 0;
   let rafId = null;
 
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -411,8 +424,11 @@ function buildEnvelopeModule(engine, onLogged) {
     playDot.setAttribute('transform', `translate(${x} ${y}) scale(${sx} ${sy})`);
   };
 
-  // Where on the curve a note of age `t` seconds sits, before release.
-  const heldPosition = (t, g) => {
+  // Where the drawn attack/decay/hold shape sits at real elapsed time `t`
+  // since note-on. Every value returned is a point that lies exactly on the
+  // polyline drawEnvelopeViz() draws — this is the single source both the
+  // "still held" case and the release lerp's start point read from.
+  const walkPosition = (t, g) => {
     const { attack, decay } = state;
     if (t < attack) return [lerp(0, g.x1, attack ? t / attack : 1), lerp(g.floor, g.peakY, attack ? t / attack : 1)];
     const td = t - attack;
@@ -421,24 +437,42 @@ function buildEnvelopeModule(engine, onLogged) {
     return [Math.min(g.x2 + (th / HOLD_TRAVERSE_S) * (g.sustainEnd - g.x2), g.sustainEnd), g.sustainY];
   };
 
+  const holdEndsAt = () => state.attack + state.decay + HOLD_TRAVERSE_S;
+
   const frame = () => {
     const now = performance.now() / 1000;
     const g = geometry;
-    if (releaseFrom) {
-      const t = state.release ? (now - releaseStart) / state.release : 1;
-      if (t >= 1) { stopPlayhead(); return; }
-      setPlayhead(lerp(releaseFrom[0], g.x3, t), lerp(releaseFrom[1], g.floor, t), true);
-    } else {
-      const [x, y] = heldPosition(now - noteStart, g);
+    const heldT = now - noteStart;
+
+    if (!released) {
+      const [x, y] = walkPosition(heldT, g);
       setPlayhead(x, y, true);
+      rafId = requestAnimationFrame(frame);
+      return;
     }
+
+    // Release doesn't begin until the shape has actually finished drawing
+    // out to the hold's end — a key released mid-attack still gets to watch
+    // attack and decay land before the release segment starts, which is what
+    // keeps the dot on the curve instead of cutting across to it.
+    const releaseAnchorT = Math.max(keyUpAt - noteStart, holdEndsAt());
+    if (heldT < releaseAnchorT) {
+      const [x, y] = walkPosition(heldT, g);
+      setPlayhead(x, y, true);
+      rafId = requestAnimationFrame(frame);
+      return;
+    }
+    const relT = state.release ? (heldT - releaseAnchorT) / state.release : 1;
+    if (relT >= 1) { stopPlayhead(); return; }
+    const [fx, fy] = walkPosition(releaseAnchorT, g);
+    setPlayhead(lerp(fx, g.x3, relT), lerp(fy, g.floor, relT), true);
     rafId = requestAnimationFrame(frame);
   };
 
   function stopPlayhead() {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
-    releaseFrom = null;
+    released = false;
     setPlayhead(0, 0, false);
   }
 
@@ -446,13 +480,11 @@ function buildEnvelopeModule(engine, onLogged) {
     const now = performance.now() / 1000;
     if (type === 'on') {
       noteStart = now;
-      releaseFrom = null;
+      released = false;
       if (!rafId) rafId = requestAnimationFrame(frame);
     } else {
-      // Release from wherever the note actually got to, not from a fixed
-      // point — a key let go mid-attack falls from mid-attack.
-      releaseFrom = heldPosition(now - noteStart, geometry);
-      releaseStart = now;
+      released = true;
+      keyUpAt = now;
       if (!rafId) rafId = requestAnimationFrame(frame);
     }
   });
