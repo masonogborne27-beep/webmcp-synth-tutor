@@ -41,11 +41,14 @@ function ensureKnobDefs() {
   grad.setAttribute('cx', '35%');
   grad.setAttribute('cy', '30%');
   grad.setAttribute('r', '75%');
+  // Bright, glossy dial to match the redesign's light chassis — a white/
+  // frosted-glass cap catching light off-center, not the old dark plastic
+  // disc, which read as a leftover dark-theme element on a bright card.
   [
-    ['0%', '#6a6a74'],
-    ['35%', '#3d3d44'],
-    ['80%', '#222226'],
-    ['100%', '#151517'],
+    ['0%', '#ffffff'],
+    ['32%', '#f4f4f6'],
+    ['72%', '#dedee3'],
+    ['100%', '#c6c6cc'],
   ].forEach(([offset, color]) => {
     const stop = document.createElementNS(svgNS, 'stop');
     stop.setAttribute('offset', offset);

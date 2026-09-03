@@ -1,99 +1,170 @@
 :root {
-  /* Grey scale is the actual "material" now. Previous attempt used small
-     linear steps (+14, +16 per channel) that measured as "distinct" but
-     read as nearly identical once rendered — dark tones need much bigger
-     raw gaps to look like equal perceptual steps (gamma/low-light contrast
-     sensitivity isn't linear). This ramp roughly follows Tailwind's zinc
-     900/700/600/500/400 — a much bigger, unambiguous jump at every step. */
-  /* Lighter grey, not near-black — kept below --panel-sunken (#2f2f34) so
-     the sunken/recessed surfaces still read as darker than the page behind
-     them. --bg-grid stays near-black on purpose: it's the "digital display"
-     zones (Output scope, agent chat, filter/osc canvases), a deliberately
-     different, darker material from the page background itself. */
-  --bg: #232327;
-  --bg-grid: #08080a;
-  --panel: #52525b;
-  --panel-raised: #71717a;
-  --panel-sunken: #2f2f34;
-  --border: #a1a1aa;
-  --seam: #d4d4d8;
-  --text: #ebe9e7;
-  --text-dim: #8b8a90;
-  /* Mint stays the ONE bright accent (user-driven state: selection, "on",
-     knob fill). Amber is reserved specifically for agent-driven changes —
-     the reasoning bubbles — so a viewer can tell "who" touched a control
-     at a glance. Don't add a third accent color. */
-  --accent: #5eead4;
-  --accent-dim: #1d3d3a;
-  --accent-strong: #2dd4bf;
-  --amber: #ffb454;
-  --amber-dim: #4a3620;
-  --bad: #ff6b6b;
-  --shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
-  --shadow-sm: 0 4px 12px -4px rgba(0, 0, 0, 0.4);
-  /* Tactile button bevels: raised by default, inverted (pressed-in) when
-     active/selected. Shared as variables so every control reads consistently. */
+  /* ---------- Apple-style redesign: bright, sleek, materials-driven ----------
+     The chassis (page, panels, chrome) is now a light, layered material
+     system instead of a dark hardware casing. The one deliberate exception
+     is --bg-grid: real Apple hardware pairs a bright aluminum body with a
+     black glass screen, and this app's "screens" (scope, canvases, chat
+     log) keep that same logic — a genuinely different, darker material
+     from the bright chassis around them, not an inconsistency. */
+  --bg: #f5f5f7;
+  --bg-grid: #0b0b0d;
+  --panel: #ffffff;
+  --panel-raised: #ffffff;
+  /* Darkened from an initial e8e8ec: against pure white that measured
+     ~1.25:1 contrast, close to invisible as a "recessed groove" fill for
+     the knob track / toggle track. */
+  /* Measured, not eyeballed: e8e8ec first tried against white panel measured
+     ~1.25:1 (near-invisible as a knob/toggle track groove); this second pass
+     still only reached 1.34:1, so it moved once more. */
+  --panel-sunken: #d6d6dd;
+  --border: #d2d2d9;
+  --seam: #ffffff;
+  --text: #1d1d1f;
+  --text-dim: #6e6e73;
+  /* Deep, saturated teal — the pale mint that worked on a near-black page
+     reads washed-out on white, so the whole accent ramp moved a few steps
+     darker to keep the same hue family at real contrast on a bright ground.
+     Measured: an initial #0d9488 tested at only 3.74:1 against white — under
+     WCAG AA's 4.5:1 for normal text, and --accent is used as real persistent
+     text (the WebMCP-ready label), not just a hover flourish. Moved to
+     teal-700, which measures 5.47:1. */
+  --accent: #0f766e;
+  --accent-dim: #ccfbf1;
+  --accent-strong: #115e59;
+  /* A second accent, deliberately different from --accent: the dark
+     "screen" surfaces (scope, filter/envelope/osc canvases, the chat log)
+     kept their near-black material on purpose, so they still need a bright,
+     glowing trace color to read against black glass — the same job the
+     whole app's accent used to do back when the whole chassis was dark.
+     Using the new darker --accent there would be nearly invisible. */
+  --accent-glow: #5eead4;
+  /* Measured: an initial #d97706 against --amber-dim's pale fill tested at
+     only 2.86:1 — read as real text (the applied-value labels in an agent
+     reply), that's well under AA. Moved to amber-800, which measures 5.1:1
+     against the same fill. */
+  --amber: #92400e;
+  --amber-dim: #fef3c7;
+  /* Same split as accent/accent-glow: the agent-status badge is a dark chip
+     (--bg-grid) that needs a bright amber to read against near-black — the
+     darker, text-safe --amber above would be nearly invisible there. */
+  --amber-glow: #ffb454;
+  --bad: #dc2626;
+  /* Layered, soft-edged shadows — the actual depth cue on a light surface
+     (a light-on-light inset bevel barely reads), tiered by how far a
+     surface sits off the page: sm for a resting card, default for a raised
+     control, lg for something floating above everything else (the agent
+     panel, a dragged element). */
+  --shadow-sm: 0 1px 2px rgba(20, 20, 25, 0.05), 0 1px 1px rgba(20, 20, 25, 0.04);
+  --shadow: 0 2px 6px rgba(20, 20, 25, 0.06), 0 8px 20px -6px rgba(20, 20, 25, 0.10);
+  --shadow-lg: 0 8px 16px rgba(20, 20, 25, 0.08), 0 24px 48px -12px rgba(20, 20, 25, 0.18);
+  /* Tactile button bevels: raised by default (external shadow + a bright
+     top inset catching light, since white-on-white has no room for a dark
+     bevel), inverted to a sunken inset when pressed/active — the surface
+     reads as physically pushed in rather than just recoloured. */
   --bevel-raised:
-    inset 0 2px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -3px 5px rgba(0, 0, 0, 0.6),
-    0 2px 4px rgba(0, 0, 0, 0.45);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(20, 20, 25, 0.04),
+    0 1px 2px rgba(20, 20, 25, 0.08),
+    0 3px 8px -2px rgba(20, 20, 25, 0.10);
   --bevel-pressed:
-    inset 0 -1.5px 0 rgba(255, 255, 255, 0.07),
-    inset 0 3px 7px rgba(0, 0, 0, 0.75);
+    inset 0 2px 5px rgba(20, 20, 25, 0.14),
+    inset 0 1px 2px rgba(20, 20, 25, 0.10);
   /* A soft top-lit sheen, layered over a flat panel color as an extra
      background image — the same physical-surface language the knob caps'
      radial gradient already established, applied to pills and buttons that
      were still a single flat fill plus a shadow (dimension from the outline
      alone, none from the surface itself). */
-  --surface-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%);
-  --radius: 10px;
-  --radius-lg: 16px;
-  --radius-sm: 8px;
-  --display: "Space Grotesk", "IBM Plex Sans", -apple-system, sans-serif;
-  --body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --surface-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 55%);
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-sm: 10px;
+  /* System font first, per Apple's own typography guidance — it already
+     ships optical sizing, tracking tables, and legibility tuning that a
+     custom display face (the old Space Grotesk) doesn't have. IBM Plex Mono
+     stays for the instrument-panel numeric readouts, where a monospace grid
+     is a functional choice, not a branding one. */
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Spring-like easing curves (CSS can't do true physics springs, but these
+     approximate Apple's two house feels): smooth is a critically-damped
+     settle (damping ~1.0) for ordinary hover/press feedback; bounce is a
+     slight overshoot (damping ~0.8), reserved for momentum-carrying snaps
+     (a toggle flipping, a value landing) per the "only add bounce where a
+     gesture earns it" rule. */
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Glass material for floating chrome (topbar, agent panel) — a real
+     backdrop-filter blur so content actually reads as scrolling underneath,
+     per prefers-reduced-transparency this collapses to a solid surface below. */
+  --glass-blur: blur(20px) saturate(180%);
 }
 
 * { box-sizing: border-box; }
 
-/* A physical instrument casing, not a flat swatch: a soft top glow, a
-   darker floor, and a faint grain so it reads as material rather than a
-   flat color. The grain is an inline SVG turbulence filter — no image
-   asset, no extra request. */
 body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
-  font-family: var(--body);
+  font: 100%/1.5 var(--body);
   background-color: var(--bg);
-  background-image:
-    radial-gradient(ellipse 1100px 700px at 50% -12%, rgba(94, 234, 212, 0.05), transparent 60%),
-    radial-gradient(ellipse 1300px 800px at 50% 112%, rgba(0, 0, 0, 0.55), transparent 65%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-  background-repeat: no-repeat, no-repeat, repeat;
-  background-size: cover, cover, 140px 140px;
-  background-attachment: fixed, fixed, fixed;
+  /* A very soft, wide glow rather than the old dark vignette — depth from
+     a barely-there light gradient, not a heavy material. */
+  background-image: radial-gradient(ellipse 1200px 800px at 50% -10%, rgba(13, 148, 136, 0.06), transparent 60%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass-blur: none; }
 }
 
 /* ---------- topbar ---------- */
+/* Floating glass toolbar: sticky so content actually scrolls underneath it
+   (the whole point of a translucent material — a nav bar that's just
+   permanently opaque at the top isn't using the material at all), with a
+   soft blur+saturate rather than a hard-edged opaque bar. The bottom edge
+   is a scroll fade (::after), not a 1px border, per "scroll edge effects,
+   not hard dividers" — it only needs to separate once content has actually
+   scrolled up underneath it. */
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 22px 24px 16px;
+  padding: 18px 24px;
+  background: rgba(245, 245, 247, 0.72);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -12px;
+  height: 12px;
+  background: linear-gradient(rgba(20, 20, 25, 0.05), transparent);
+  pointer-events: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .topbar { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 .brand { display: flex; flex-direction: column; gap: 6px; }
 .brand-top { display: flex; align-items: baseline; gap: 10px; }
 .brand-mark { color: var(--accent); font-size: 19px; }
 .topbar h1 {
-  font-size: 21px;
+  font-size: 22px;
   margin: 0;
   font-weight: 700;
   font-family: var(--display);
-  letter-spacing: -0.01em;
+  /* Negative tracking at display size — letters read too far apart at 22px
+     without it, per the size-specific tracking rule (never one value for
+     every size). */
+  letter-spacing: -0.022em;
 }
 .brand-sub { color: var(--text-dim); font-weight: 400; font-size: 13px; font-family: var(--body); white-space: nowrap; }
 .brand-tagline {
@@ -122,7 +193,10 @@ body {
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  /* --text-dim measured only 3.88:1 on this dark --bg-grid chip (it's tuned
+     for the light chassis, where it hits 5.07:1) — --border reads as a
+     normal soft grey here and measures 13:1. */
+  color: var(--border);
 }
 .patch-character-words { display: flex; align-items: center; gap: 7px; }
 .patch-character-word {
@@ -130,10 +204,12 @@ body {
   font-weight: 600;
   font-size: 11px;
   letter-spacing: 0.1em;
-  color: var(--accent);
+  /* This chip is a dark "readout" screen sitting on the bright chassis (see
+     --bg-grid), so it needs the glowing screen accent, not the chassis one. */
+  color: var(--accent-glow);
   text-shadow: 0 0 10px rgba(94, 234, 212, 0.45);
 }
-.patch-character-sep { color: var(--text-dim); font-size: 10px; }
+.patch-character-sep { color: var(--border); font-size: 10px; }
 
 .mcp-status {
   display: flex;
@@ -175,11 +251,22 @@ body {
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   z-index: 60;
-  background: var(--panel);
-  border: 1px solid var(--accent-dim);
+  /* Glass, not a solid card: this is a parallel, non-blocking panel floating
+     over the instrument (no dimming scrim, per the materials guidance for
+     exactly this case) — a translucent surface says "floating above,
+     content keeps going underneath" in a way an opaque card doesn't. It's
+     the single most-elevated surface on the page, so it gets the heaviest
+     shadow tier. */
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius-lg);
   padding: 18px 20px;
-  box-shadow: var(--shadow), 0 0 32px -12px rgba(94, 234, 212, 0.28);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(13, 148, 136, 0.08);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .agent-panel { background: var(--panel); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 .agent-header {
   position: relative;
@@ -228,7 +315,11 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--text-dim);
+  /* Always overridden by one of .agent-status--ready/thinking/responded/
+     error in practice (the markup starts with --ready applied) — --border
+     here purely so this base value is dark-screen-correct too, on the off
+     chance it's ever visible unstyled. */
+  color: var(--border);
 }
 .agent-status-dot {
   width: 7px; height: 7px;
@@ -236,22 +327,22 @@ body {
   flex-shrink: 0;
   background: var(--text-dim);
 }
-.agent-status--ready { color: var(--accent); border-color: var(--accent-dim); }
+.agent-status--ready { color: var(--accent-glow); border-color: var(--accent-dim); }
 .agent-status--ready .agent-status-dot {
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
+  background: var(--accent-glow);
+  box-shadow: 0 0 6px var(--accent-glow);
   animation: agent-pulse 2.4s ease-in-out infinite;
 }
-.agent-status--thinking { color: var(--amber); border-color: var(--amber); }
+.agent-status--thinking { color: var(--amber-glow); border-color: var(--amber-glow); }
 .agent-status--thinking .agent-status-dot {
-  background: var(--amber);
-  box-shadow: 0 0 6px var(--amber);
+  background: var(--amber-glow);
+  box-shadow: 0 0 6px var(--amber-glow);
   animation: agent-pulse 0.8s ease-in-out infinite;
 }
-.agent-status--responded { color: var(--amber); border-color: var(--amber); }
+.agent-status--responded { color: var(--amber-glow); border-color: var(--amber-glow); }
 .agent-status--responded .agent-status-dot {
-  background: var(--amber);
-  box-shadow: 0 0 10px var(--amber);
+  background: var(--amber-glow);
+  box-shadow: 0 0 10px var(--amber-glow);
 }
 .agent-status--error { color: var(--bad); border-color: var(--bad); }
 .agent-status--error .agent-status-dot { background: var(--bad); box-shadow: 0 0 6px var(--bad); }
@@ -328,7 +419,11 @@ body {
 
 .agent-msg--status {
   align-self: flex-start;
-  color: var(--text-dim);
+  /* Sits directly on the dark --bg-grid chat log, not the light chassis —
+     --text-dim measured only 3.88:1 there (tuned for the light panel, where
+     it hits 5.07:1); --border, otherwise just a hairline color, measures
+     13:1 on this dark background and reads as a normal soft grey here. */
+  color: var(--border);
   font-style: italic;
   font-size: 12.5px;
   background: transparent;
@@ -351,22 +446,30 @@ body {
   padding: 12px 18px;
   font-size: 14px;
   font-family: var(--body);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 3px rgba(20, 20, 25, 0.08);
+  transition: box-shadow 160ms var(--ease-smooth), border-color 160ms var(--ease-smooth);
 }
-.agent-form input:focus { outline: none; border-color: var(--accent); }
+.agent-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 1px 3px rgba(20, 20, 25, 0.06), 0 0 0 3px var(--accent-dim);
+}
 .agent-form button {
   background: var(--accent);
   border: none;
-  color: #06231d;
+  /* White, not the old near-black #06231d: that was tuned for high contrast
+     against the old *pale* mint fill — against the new darker teal, dark
+     text would be nearly as dark as the fill itself. */
+  color: #ffffff;
   font-weight: 700;
   font-family: var(--body);
   border-radius: 999px;
   padding: 12px 26px;
   cursor: pointer;
-  box-shadow: 0 4px 14px -4px rgba(94, 234, 212, 0.5), var(--bevel-raised);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  box-shadow: 0 4px 14px -4px rgba(13, 148, 136, 0.4), var(--bevel-raised);
+  transition: transform 160ms var(--ease-smooth), box-shadow 160ms var(--ease-smooth);
 }
-.agent-form button:hover:not(:disabled) { transform: translateY(-1px); }
+.agent-form button:hover:not(:disabled) { transform: translateY(-1px); background: var(--accent-strong); }
 .agent-form button:active:not(:disabled) { transform: translateY(1px); box-shadow: var(--bevel-pressed); }
 .agent-form button:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 
@@ -400,10 +503,13 @@ body {
   cursor: pointer;
   white-space: nowrap;
   box-shadow: var(--bevel-raised);
-  transition: border-color 0.15s, color 0.15s, transform 0.08s, box-shadow 0.08s;
+  transition: border-color 180ms var(--ease-smooth), color 180ms var(--ease-smooth),
+    transform 140ms var(--ease-smooth), box-shadow 140ms var(--ease-smooth);
 }
 .preset-card:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
-.preset-card:active { transform: translateY(1px); box-shadow: var(--bevel-pressed); }
+/* Press feedback stays fast/near-instant (~press, not settle) — the point
+   is a button reacting to touch-down, not a smoothed animation. */
+.preset-card:active { transform: translateY(1px); box-shadow: var(--bevel-pressed); transition-duration: 60ms; }
 .preset-card .badge {
   display: inline-flex;
   align-items: center;
@@ -430,10 +536,11 @@ body {
   cursor: pointer;
   white-space: nowrap;
   box-shadow: var(--bevel-raised);
-  transition: border-color 0.15s, color 0.15s, transform 0.08s, box-shadow 0.08s;
+  transition: border-color 180ms var(--ease-smooth), color 180ms var(--ease-smooth),
+    transform 140ms var(--ease-smooth), box-shadow 140ms var(--ease-smooth);
 }
 .surprise-btn:hover { border-color: var(--accent); color: var(--accent); }
-.surprise-btn:active { transform: translateY(1px); box-shadow: var(--bevel-pressed); }
+.surprise-btn:active { transform: translateY(1px); box-shadow: var(--bevel-pressed); transition-duration: 60ms; }
 
 /* ---------- the instrument: Envelope/Filter/Delay on top, the 3
    oscillators in the middle, a full-width Output stage on the bottom. ---------- */
@@ -513,6 +620,12 @@ body {
 /* Hardware faceplate: tighter corners than a software card, a beveled edge
    (inset highlight + shadow), and a faint seam line near the top — like a
    physical panel screwed into a chassis, not a dashboard tile. */
+/* A card floating on the page — depth from the external layered shadow, not
+   an inset bevel (a light-on-white inset highlight is invisible, and a dark
+   inset only reads as a smudge on a card this bright). The old "seam" line
+   pseudo-element is gone for the same reason: it existed to catch light on
+   a dark hardware faceplate, and on a plain white card that job is already
+   done by the shadow + hairline border. */
 .module {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -520,18 +633,11 @@ body {
   padding: 18px 16px 16px;
   position: relative;
   min-width: 176px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.35),
-    var(--shadow);
+  box-shadow: var(--shadow);
+  transition: box-shadow 200ms var(--ease-smooth), transform 200ms var(--ease-smooth);
 }
-.module::before {
-  content: "";
-  position: absolute;
-  top: 9px; left: 14px; right: 14px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--seam) 15%, var(--seam) 85%, transparent);
-  pointer-events: none;
+@media (prefers-reduced-motion: reduce) {
+  .module { transition: none; }
 }
 
 .module-title {
@@ -556,7 +662,7 @@ body {
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
-  color: var(--accent);
+  color: var(--accent-glow);
   background: var(--bg-grid);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -588,9 +694,12 @@ body {
   background: radial-gradient(circle at 35% 30%, #45454c, var(--panel-sunken) 75%);
   box-shadow: var(--bevel-raised);
   cursor: pointer;
-  transition: background-color 0.15s, box-shadow 0.15s;
+  transition: background-color 180ms var(--ease-smooth), box-shadow 180ms var(--ease-smooth);
 }
 .osc-power:hover { box-shadow: var(--bevel-raised), 0 0 0 2px var(--border); }
+@media (prefers-reduced-motion: reduce) {
+  .osc-power { transition: none; }
+}
 .osc-power.on {
   background: radial-gradient(circle at 35% 30%, var(--accent-strong), var(--accent-dim) 80%);
   box-shadow: var(--bevel-pressed), 0 0 8px rgba(94, 234, 212, 0.65);
@@ -632,13 +741,19 @@ body {
   padding: 4px;
   width: 32px; height: 26px;
   box-shadow: var(--bevel-raised);
-  transition: transform 0.08s ease, box-shadow 0.08s ease, color 0.1s ease, border-color 0.1s ease;
+  transition: transform 140ms var(--ease-smooth), box-shadow 140ms var(--ease-smooth),
+    color 140ms var(--ease-smooth), border-color 140ms var(--ease-smooth);
 }
 /* Was color-only — every other button-like control lifts and brightens its
    border on hover, this was the one left responding with just a text-color
    swap. */
 .wave-mini-btn:hover { color: var(--text); border-color: var(--accent-dim); transform: translateY(-1px); }
-.wave-mini-btn:active { transform: translateY(1px); }
+.wave-mini-btn:active { transform: translateY(1px); transition-duration: 60ms; }
+/* Instant state changes, not no state changes — a selected waveform/preset
+   still needs to look selected, it just shouldn't animate into place. */
+@media (prefers-reduced-motion: reduce) {
+  .preset-card, .surprise-btn, .wave-mini-btn { transition-duration: 0ms !important; }
+}
 .wave-mini-btn svg { width: 100%; height: 100%; }
 .wave-mini-btn path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .wave-mini-btn.active {
@@ -657,14 +772,26 @@ body {
   width: 46px; height: 46px;
   cursor: ns-resize;
   touch-action: none;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
-  transition: filter 0.1s ease;
+  /* Two-layer shadow — a tight contact shadow plus a softer, wider one
+     further out — the same "how far off the surface does this sit" cue as
+     the card shadows, scaled down for a small control. */
+  filter: drop-shadow(0 1px 1px rgba(20, 20, 25, 0.18)) drop-shadow(0 3px 6px rgba(20, 20, 25, 0.12));
+  transition: filter 160ms var(--ease-smooth), transform 160ms var(--ease-smooth);
 }
-.knob-dial.dragging { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) brightness(1.12); }
+.knob-dial.dragging {
+  filter: drop-shadow(0 2px 3px rgba(20, 20, 25, 0.22)) drop-shadow(0 6px 14px rgba(20, 20, 25, 0.16)) brightness(1.04);
+  transform: scale(1.04);
+}
 /* Was completely silent on hover despite being the single most-used control
-   on the page — a small brightness lift, short of dragging's full boost,
-   signals "this turns" before the user commits to a drag. */
-.knob-dial:hover:not(.dragging) { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)) brightness(1.06); }
+   on the page — a small lift, short of dragging's full boost, signals
+   "this turns" before the user commits to a drag. */
+.knob-dial:hover:not(.dragging) {
+  filter: drop-shadow(0 2px 3px rgba(20, 20, 25, 0.2)) drop-shadow(0 4px 9px rgba(20, 20, 25, 0.14));
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .knob-dial, .knob-dial.dragging, .knob-dial:hover { transform: none; transition: none; }
+}
 /* Graduated scale: faint minor ticks with brighter majors at both ends and
    centre, so the sweep reads as a measured range rather than a bare circle. */
 .knob-tick { stroke: var(--border); stroke-width: 1.25; stroke-linecap: round; opacity: 0.4; }
@@ -685,7 +812,9 @@ body {
 }
 .knob-track { fill: none; stroke: var(--panel-sunken); stroke-width: 5; stroke-linecap: round; }
 .knob-fill { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
-.knob-cap { stroke: rgba(0, 0, 0, 0.5); stroke-width: 1; }
+/* A soft edge, not a hard dark ring — the cap's own gradient plus the
+   dial's drop-shadow now carry the dimension. */
+.knob-cap { stroke: rgba(20, 20, 25, 0.14); stroke-width: 1; }
 .knob-pointer { stroke: var(--text); stroke-width: 2.5; stroke-linecap: round; }
 /* Small caps here is the one deliberate exception — this is silkscreened
    panel text next to a physical-feeling control, not a section heading. */
@@ -745,12 +874,12 @@ body {
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 .envelope-viz polyline.fill { fill: rgba(94, 234, 212, 0.14); stroke: none; }
-.envelope-viz polyline.line { fill: none; stroke: var(--accent); stroke-width: 1.75; }
+.envelope-viz polyline.line { fill: none; stroke: var(--accent-glow); stroke-width: 1.75; }
 
 /* Playhead: hidden until a note is actually sounding. */
 .env-playhead-line, .env-playhead-dot { opacity: 0; }
 .env-playhead-line {
-  stroke: var(--accent);
+  stroke: var(--accent-glow);
   stroke-width: 1;
   opacity: 0;
 }
@@ -758,37 +887,46 @@ body {
 .envelope-viz.env-playing .env-playhead-line { opacity: 0.35; }
 .envelope-viz.env-playing .env-playhead-dot {
   opacity: 1;
-  filter: drop-shadow(0 0 4px var(--accent));
+  filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 
 /* ---------- toggle: a sunken groove with a raised, gradient-capped thumb ---------- */
 .toggle { position: relative; display: flex; align-items: center; gap: 8px; cursor: pointer; width: fit-content; }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+/* The actual iOS pattern: a white knob throughout, and the track itself
+   fills solid with the accent color when on — not a dark "unlit" knob that
+   lights up, which was the old dark-chassis version of this control. */
 .toggle-track {
   width: 34px; height: 18px;
-  background: var(--panel-sunken);
+  background-color: var(--panel-sunken);
   border: 1px solid var(--border);
   border-radius: 999px;
   position: relative;
-  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5);
-  transition: background 0.15s;
+  box-shadow: inset 0 1px 2px rgba(20, 20, 25, 0.12);
+  /* background-color, not the background shorthand — transitioning the
+     shorthand between two flat custom-property colors was silently getting
+     stuck at the starting value instead of animating (confirmed: the
+     checked-state rule matched and won the cascade correctly, but the
+     rendered color never moved even seconds later — not a specificity or
+     timing issue, the shorthand transition itself). */
+  transition: background-color 200ms var(--ease-smooth), border-color 200ms var(--ease-smooth);
 }
 .toggle-track::after {
   content: "";
   position: absolute;
   top: 1px; left: 1px;
   width: 14px; height: 14px;
-  background: radial-gradient(circle at 35% 30%, #4a4a52, #2a2a2f 80%);
+  background: #ffffff;
   border-radius: 50%;
-  box-shadow: var(--bevel-raised);
-  transition: transform 0.15s, background 0.15s;
+  box-shadow: 0 1px 2px rgba(20, 20, 25, 0.25), 0 1px 5px rgba(20, 20, 25, 0.15);
+  transition: transform 220ms var(--ease-bounce);
 }
 .toggle:hover .toggle-track { border-color: var(--text-dim); }
-.toggle input:checked + .toggle-track { border-color: var(--accent-dim); }
-.toggle:hover input:checked + .toggle-track { border-color: var(--accent); }
-.toggle input:checked + .toggle-track::after {
-  transform: translateX(16px);
-  background: radial-gradient(circle at 35% 30%, var(--accent-strong), var(--accent-dim) 85%);
+.toggle input:checked + .toggle-track { background-color: var(--accent); border-color: var(--accent); }
+.toggle:hover input:checked + .toggle-track { background-color: var(--accent-strong); border-color: var(--accent-strong); }
+.toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+@media (prefers-reduced-motion: reduce) {
+  .toggle-track, .toggle-track::after { transition: none; }
 }
 .toggle-label { font-family: var(--body); font-size: 12px; color: var(--text-dim); }
 
@@ -891,7 +1029,10 @@ body {
   font-size: 10.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  /* Sits directly on the dark scope screen (--bg-grid), same fix as the
+     agent status message and patch-character chip: --text-dim is tuned for
+     the light chassis, --border reads correctly on near-black. */
+  color: var(--border);
 }
 
 /* ---------- keyboard ---------- */
@@ -939,7 +1080,11 @@ body {
   border-radius: 0 0 8px 8px;
   box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.08);
 }
-.key.white.active { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%); }
+/* Pressed keys get the vivid glow accent, not the muted chassis one — a
+   pressed key is a momentary "something is happening right now" state, the
+   same visual language as the agent's activity pulse and the flash
+   animation on a changed value. */
+.key.white.active { background: linear-gradient(180deg, var(--accent-glow) 0%, var(--accent) 100%); }
 .key.white:hover:not(.active) { background: linear-gradient(180deg, #ffffff 0%, #eaf3ef 100%); }
 .key.black {
   background: linear-gradient(180deg, #262b33 0%, #05070a 100%);
@@ -950,7 +1095,7 @@ body {
   border-radius: 0 0 6px 6px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
 }
-.key.black.active { background: linear-gradient(180deg, var(--accent-strong) 0%, var(--accent-dim) 100%); }
+.key.black.active { background: linear-gradient(180deg, var(--accent-glow) 0%, var(--accent-strong) 85%); }
 .key.black:hover:not(.active) { background: linear-gradient(180deg, #363c46 0%, #10141a 100%); }
 .key .key-qwerty {
   font-family: var(--mono);
@@ -962,4 +1107,7 @@ body {
   padding: 0 4px;
   line-height: 1.4;
 }
-.key.black .key-qwerty { color: var(--accent); background: rgba(94, 234, 212, 0.22); }
+/* Black keys are dark like the screens are, so their label needs the same
+   glowing accent to stay legible — the chassis accent would go nearly
+   invisible against near-black. */
+.key.black .key-qwerty { color: var(--accent-glow); background: rgba(94, 234, 212, 0.22); }

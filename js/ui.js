@@ -133,7 +133,7 @@ function drawOscWaveform(canvas, waveform, level) {
     if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   const style = getComputedStyle(document.documentElement);
-  ctx.strokeStyle = style.getPropertyValue('--accent').trim() || '#5eead4';
+  ctx.strokeStyle = style.getPropertyValue('--accent-glow').trim() || '#5eead4';
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -312,7 +312,7 @@ function drawFilterCurve(canvas, cutoff, resonance, type = 'lowpass') {
   }
   ctx.strokeStyle = 'var(--accent, #7effc0)';
   const style = getComputedStyle(document.documentElement);
-  ctx.strokeStyle = style.getPropertyValue('--accent').trim() || '#7effc0';
+  ctx.strokeStyle = style.getPropertyValue('--accent-glow').trim() || '#7effc0';
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -640,7 +640,7 @@ function drawDelayEcho(canvas, engine) {
   ctx.clearRect(0, 0, w, h);
   const { enabled, mix } = engine.effect;
   const style = getComputedStyle(document.documentElement);
-  const accent = style.getPropertyValue('--accent').trim() || '#5eead4';
+  const accent = style.getPropertyValue('--accent-glow').trim() || '#5eead4';
   const dim = style.getPropertyValue('--text-dim').trim() || '#8b8a90';
 
   const gap = 5;
@@ -758,7 +758,7 @@ function buildKeyboardUnit(engine) {
         if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
     }
-    const accent = style.getPropertyValue('--accent').trim() || '#7effc0';
+    const accent = style.getPropertyValue('--accent-glow').trim() || '#7effc0';
     ctx.strokeStyle = accent;
     ctx.lineWidth = samples ? 2.5 : 1.5;
     ctx.globalAlpha = samples ? 1 : 0.2;
