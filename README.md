@@ -1,4 +1,4 @@
-# Signal Path — Sound Design Tutor Synth
+# Synth Tutor — a synth that explains itself
 
 A browser synth built for **The WebMCP Challenge**. An AI agent connects to the page via
 [WebMCP](https://webmachinelearning.github.io/webmcp/) and can change the sound — but the
