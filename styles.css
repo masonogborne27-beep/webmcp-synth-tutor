@@ -7,7 +7,10 @@
      log) keep that same logic — a genuinely different, darker material
      from the bright chassis around them, not an inconsistency. */
   --bg: #f5f5f7;
-  --bg-grid: #0b0b0d;
+  /* Darkest grey in the palette, not black — a genuine charcoal so it still
+     reads as part of the same neutral-grey family as --border/--panel-sunken
+     rather than a hole cut out of the page. */
+  --bg-grid: #242428;
   --panel: #ffffff;
   --panel-raised: #ffffff;
   /* Darkened from an initial e8e8ec: against pure white that measured
@@ -69,6 +72,20 @@
   --bevel-pressed:
     inset 0 2px 5px rgba(20, 20, 25, 0.14),
     inset 0 1px 2px rgba(20, 20, 25, 0.10);
+  /* The waveform "screens" (filter/envelope/osc canvases, the delay echo,
+     the output scope) used to read as sunken glass — an inset shadow,
+     recessed into the panel. They now pop OUT instead, like a bubble
+     sitting on top of the surface: a bright top inset (a glass dome
+     catching light) plus a real external drop shadow lifting it off the
+     card, the same raised-surface logic as --bevel-raised, scaled up for a
+     bigger surface (per "bigger surfaces read as thicker: stronger blur +
+     a deeper shadow than small chips"). */
+  --bubble-raised:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -8px 16px -8px rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(20, 20, 25, 0.14),
+    0 12px 28px -10px rgba(20, 20, 25, 0.32);
+  --bubble-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 45%);
   /* A soft top-lit sheen, layered over a flat panel color as an extra
      background image — the same physical-surface language the knob caps'
      radial gradient already established, applied to pills and buttons that
@@ -828,16 +845,20 @@ body {
 }
 .knob-value { font-family: var(--display); font-size: 12.5px; font-weight: 700; color: var(--text); }
 
-/* ---------- filter / envelope / oscillator visuals: sunken "glass"
-   screens set into the faceplate — kept quiet and plain on purpose, the
-   Output scope below is the one dramatic element ---------- */
+/* ---------- filter / envelope / oscillator visuals: raised dark "bubbles"
+   sitting on top of the faceplate, not sunk into it — a real drop shadow
+   lifts each one off the card, with a bright top inset reading as a glass
+   dome catching light, the same raised-surface language as --bevel-raised
+   scaled up for a bigger surface. Output scope below is still the one
+   dramatic element (bigger glow, scanline texture) but shares this same
+   base material. ---------- */
 .filter-curve, .osc-viz, .delay-echo {
   width: 100%;
   height: 90px;
-  background: var(--bg-grid);
+  background: var(--bubble-gloss), var(--bg-grid);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius);
+  box-shadow: var(--bubble-raised);
   display: block;
 }
 .osc-viz { margin-bottom: 12px; }
@@ -868,10 +889,10 @@ body {
 .envelope-viz {
   width: 100%;
   height: 90px;
-  background: var(--bg-grid);
+  background: var(--bubble-gloss), var(--bg-grid);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius);
+  box-shadow: var(--bubble-raised);
 }
 .envelope-viz polyline.fill { fill: rgba(94, 234, 212, 0.14); stroke: none; }
 .envelope-viz polyline.line { fill: none; stroke: var(--accent-glow); stroke-width: 1.75; }
@@ -986,9 +1007,17 @@ body {
 .output-scope {
   position: relative;
   width: 100%;
-  background: var(--bg-grid);
+  background: var(--bubble-gloss), var(--bg-grid);
   padding: 12px 26px 8px;
-  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.7), 0 0 70px -14px rgba(94, 234, 212, 0.18);
+  /* This strip is fused flush to the keyboard below it (see .keyboard-unit),
+     so it can't cast its own external drop shadow the way the other screens
+     do — anything outside its box gets clipped by the card's own
+     overflow:hidden. The "pop, don't sink" read comes from a bright top
+     highlight instead of the old heavy inset (which was reading as a hole
+     cut into the panel, the opposite of what's wanted), plus a slightly
+     boosted glow — same bubble material as the other screens, adapted to a
+     shape that can't lift off its own surface. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 0 70px -12px rgba(94, 234, 212, 0.24);
   overflow: hidden;
 }
 .output-scope::before {
@@ -1007,7 +1036,11 @@ body {
 .output-scope::after {
   content: "";
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
+  /* Softened from a 0.6-opacity vignette starting at 50% radius: that read
+     as looking into a dark tube (a sunken/hollow cue), fighting the "pop
+     out" surface this is meant to be now. A lighter, later-starting falloff
+     keeps just enough edge shading to feel domed/curved. */
+  background: radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.32) 100%);
   pointer-events: none;
 }
 .output-scope canvas.scope {
