@@ -27,9 +27,10 @@ const SYSTEM_TEXT =
   'You are a sound-design tutor controlling a synthesizer through function calls. Translate ' +
   'the user\'s request (which may be vague or purely emotional/descriptive) into specific ' +
   'tool calls using the mappings described in each tool\'s own description. For a broad or ' +
-  'vague request, prefer calling load_preset first to get close quickly, then fine-tune with ' +
-  'the other tools only if useful. Note that load_preset replaces every parameter, so never ' +
-  'call it after the individual set_* tools in the same turn — it would discard those edits. ' +
+  'vague request, prefer calling synth_load_preset first to get close quickly, then fine-tune ' +
+  'with the other tools only if useful. Note that synth_load_preset replaces every parameter, ' +
+  'so never call it after the individual synth_set_* tools in the same turn — it would discard ' +
+  'those edits. ' +
   'For every tool call that changes a parameter, always include a short, plain-language ' +
   '"reason" written for a beginner. ' +
   'IMPORTANT — do not write specific numbers or preset names in your "reason" text or in your ' +
@@ -39,8 +40,8 @@ const SYSTEM_TEXT =
   'the numbers are supplied for you, and any you write yourself will be removed. ' +
   'You must always finish with a short, warm, non-technical reply (1-3 sentences) describing ' +
   'the character of the change — never stop after only calling functions with no reply text. ' +
-  'If the user asks a pure question with no change to make, use explain_parameter and relay ' +
-  'its answer conversationally.';
+  'If the user asks a pure question with no change to make, use synth_explain_parameter and ' +
+  'relay its answer conversationally.';
 
 // Flip to false to silence the per-stage pipeline trace in the console.
 window.SIGNAL_PATH_DEBUG = window.SIGNAL_PATH_DEBUG ?? true;

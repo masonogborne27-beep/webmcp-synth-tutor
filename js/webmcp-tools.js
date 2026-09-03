@@ -16,11 +16,16 @@ const PARAM_EXPLANATIONS = {
     'sawtooth plus a detuned square is a classic "fat" unison lead; a sawtooth plus a ' +
     'sub-sine an octave down is a classic bass patch.',
   filter:
-    'The lowpass filter cuts everything above its cutoff frequency, so lowering cutoff ' +
-    'removes high-end sparkle and makes a sound feel warmer, darker, or more muffled; ' +
-    'raising it lets more high frequencies through for a brighter, thinner, more present ' +
-    'tone. Resonance boosts the frequencies right at the cutoff point — a little adds a ' +
-    'characterful "wah" or nasal edge, a lot gets squelchy or even self-oscillates into a whistle.',
+    'The filter shapes which frequencies get through, applied after the oscillator mix. Type ' +
+    'sets the basic shape: lowpass (default) keeps lows and cuts highs — lowering its cutoff ' +
+    'makes a sound warmer/darker/muffled, raising it makes it brighter/thinner/more present. ' +
+    'Highpass is the mirror image — cuts lows, keeps highs — for thin/telephone/no-bass/airy ' +
+    'sounds. Bandpass only lets a narrow band through, for nasal/muffled-radio/narrow tones. ' +
+    'Resonance boosts the frequencies right at the cutoff — a little adds a characterful "wah" ' +
+    'or nasal edge, a lot gets squelchy or can self-oscillate into a whistle; on a bandpass it ' +
+    'narrows the band instead. Env amount sweeps the cutoff open or closed over the life of ' +
+    'each note (using the same attack/decay/sustain timing as the amplitude envelope) instead ' +
+    'of sitting still — this is what makes a "pluck" or "wow" sound, versus a static tone.',
   envelope:
     'ADSR shapes volume over the life of a note. Attack is how long it takes to reach full ' +
     'volume after a key press — fast attack sounds punchy/plucky, slow attack sounds like a ' +
@@ -44,6 +49,15 @@ const REASON_FIELD = {
     'the module you just changed, and read back to the user as your reply.',
 };
 
+// Tool annotation hints (MCP/WebMCP convention — advisory, not enforced):
+// every set_*/load_preset tool changes in-memory synth state that's always
+// trivially overwritten by the next call, never destroys anything external,
+// produces the same end state for the same args (idempotent), and never
+// touches anything outside this page (not open-world). explain_parameter
+// changes nothing at all.
+const SYNTH_MUTATING_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const SYNTH_READONLY_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+
 // Returns the tool definitions as plain data + execute functions, independent
 // of WebMCP. Both registerWebMcpTools() and the Agent panel consume this.
 function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
@@ -65,7 +79,8 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
 
   return [
     {
-      name: 'set_oscillator',
+      name: 'synth_set_oscillator',
+      annotations: SYNTH_MUTATING_ANNOTATIONS,
       description:
         'Configure one of the synth\'s 3 mixable oscillators (oscillator: 1, 2, or 3). This ' +
         'is the primary way to shape tone color and thickness. waveform sets harmonic ' +
@@ -92,43 +107,72 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         required: ['oscillator'],
       },
       execute: async ({ oscillator, waveform, level, detune, semitone, reason }) => {
+        // The inputSchema enum already keeps a schema-respecting caller from
+        // sending an out-of-range oscillator, but a defensive check turns a
+        // silent no-op (the old behavior — engine.setOscillator just returns
+        // if the index doesn't exist) into an actionable error the model can
+        // recover from instead of reporting success on a change that never
+        // happened.
+        if (!Number.isInteger(oscillator) || oscillator < 1 || oscillator > 3) {
+          return `Error: oscillator must be 1, 2, or 3 (got ${JSON.stringify(oscillator)}). No change was made.`;
+        }
         const index = oscillator - 1;
         engine.setOscillator(index, { waveform, level, detune, semitone });
         oscUIs[index].setState({ waveform, level, semitone });
         const applied = report(`oscillator-${index}`, reason);
-        logCall('set_oscillator', { oscillator, waveform, level, detune, semitone, reason }, applied);
+        logCall('synth_set_oscillator', { oscillator, waveform, level, detune, semitone, reason }, applied);
         return `Oscillator ${oscillator} is now: ${applied}.`;
       },
     },
     {
-      name: 'set_filter',
+      name: 'synth_set_filter',
+      annotations: SYNTH_MUTATING_ANNOTATIONS,
       description:
-        'Adjust the lowpass filter that shapes brightness/warmth, applied after the oscillator ' +
-        'mix. cutoff (20-20000 Hz): lower = warmer/darker/muddier/duller, higher = brighter/' +
-        'thinner/harsher/more present. For "warmer", "muddy", "lo-fi", "underwater" requests, ' +
-        'lower the cutoff (roughly 300-1200 Hz for very warm/muffled, 1500-4000 Hz for gentle ' +
-        'warmth). For "brighter", "crisper", "cutting through the mix", raise it (5000 Hz+). ' +
-        'resonance (0-20) emphasizes frequencies right at the cutoff: a little (1-4) adds ' +
-        'character or a "wah"/nasal quality, a lot (8+) gets squelchy/acid-like or can ' +
-        'self-oscillate into a whistle. Either field can be omitted to leave it unchanged.',
+        'Adjust the filter that shapes brightness/warmth, applied after the oscillator mix. ' +
+        'type ("lowpass"/"highpass"/"bandpass"): lowpass (default) keeps lows and cuts highs; ' +
+        'highpass is the mirror image (cuts lows, keeps highs) for "thin"/"telephone"/' +
+        '"no bass"/"airy" requests; bandpass only lets a narrow band through, for "nasal"/' +
+        '"muffled radio"/"narrow" requests. cutoff (20-20000 Hz, the center/corner frequency ' +
+        'depending on type): for a lowpass, lower = warmer/darker/muddier, higher = brighter/' +
+        'thinner/more present (roughly 300-1200 Hz for very warm/muffled, 5000 Hz+ for bright/' +
+        'crisp); for a highpass, HIGHER cutoff removes MORE bass (thinner), lower removes ' +
+        'almost nothing. resonance (0-20) emphasizes frequencies at the cutoff: a little (1-4) ' +
+        'adds character or a "wah", a lot (8+) gets squelchy/acid-like or can self-oscillate ' +
+        'into a whistle; on a bandpass, higher resonance narrows the band instead. envAmount ' +
+        '(-4 to 4 octaves, default 0) sweeps the cutoff over each note\'s attack/decay/sustain ' +
+        '(reusing the envelope\'s own timing) instead of holding still: +2 to +4 is the classic ' +
+        '"pluck"/"wow" sweep (opens bright on the attack, settles down through decay); negative ' +
+        'values invert it (opens dark, brightens on release). Leave a field out to leave it ' +
+        'unchanged — only cutoff and resonance have UI knobs shown at rest, so envAmount and ' +
+        'type are this synth\'s hidden depth, worth reaching for on "pluck", "wow", "talking", ' +
+        'or "movement" requests rather than only ever setting a static cutoff.',
       inputSchema: {
         type: 'object',
         properties: {
           cutoff: { type: 'number', minimum: 20, maximum: 20000 },
           resonance: { type: 'number', minimum: 0, maximum: 20 },
+          type: { type: 'string', enum: FILTER_TYPES, description: 'Filter shape. Omit to leave unchanged.' },
+          envAmount: {
+            type: 'number', minimum: -4, maximum: 4,
+            description: 'Filter envelope depth in octaves, swept over each note using the envelope\'s attack/decay/sustain timing. 0 = static filter (default).',
+          },
           reason: REASON_FIELD,
         },
       },
-      execute: async ({ cutoff, resonance, reason }) => {
-        engine.setFilter({ cutoff, resonance });
-        filterUI.setState({ cutoff, resonance });
+      execute: async ({ cutoff, resonance, type, envAmount, reason }) => {
+        if (type != null && !FILTER_TYPES.includes(type)) {
+          return `Error: type must be one of ${FILTER_TYPES.join(', ')} (got ${JSON.stringify(type)}). No change was made.`;
+        }
+        engine.setFilter({ cutoff, resonance, type, envAmount });
+        filterUI.setState({ cutoff, resonance, type, envAmount });
         const applied = report('filter', reason);
-        logCall('set_filter', { cutoff, resonance, reason }, applied);
+        logCall('synth_set_filter', { cutoff, resonance, type, envAmount, reason }, applied);
         return `Filter is now: ${applied}.`;
       },
     },
     {
-      name: 'set_envelope',
+      name: 'synth_set_envelope',
+      annotations: SYNTH_MUTATING_ANNOTATIONS,
       description:
         'Adjust the ADSR amplitude envelope, shared by the full oscillator mix. attack ' +
         '(seconds) is fade-in time — near 0 is punchy/plucky/percussive, 0.3s+ is a slow swell ' +
@@ -155,12 +199,13 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         // playhead walks the curve while the note sounds.
         engine.auditionNote();
         const applied = report('envelope', reason);
-        logCall('set_envelope', { attack, decay, sustain, release, reason }, applied);
+        logCall('synth_set_envelope', { attack, decay, sustain, release, reason }, applied);
         return `Envelope is now: ${applied}.`;
       },
     },
     {
-      name: 'set_effect',
+      name: 'synth_set_effect',
+      annotations: SYNTH_MUTATING_ANNOTATIONS,
       description:
         'Toggle and blend the synth\'s single built-in effect: a delay (echo). enabled turns it ' +
         'on/off. mix (0-1): low (0.1-0.25) is a subtle thickening/slapback, high (0.4+) is ' +
@@ -180,18 +225,19 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         engine.setEffect({ enabled, mix });
         effectUI.setState({ enabled, mix });
         const applied = report('effect', reason);
-        logCall('set_effect', { enabled, mix, reason }, applied);
+        logCall('synth_set_effect', { enabled, mix, reason }, applied);
         return `Delay is now: ${applied}.`;
       },
     },
     {
-      name: 'load_preset',
+      name: 'synth_load_preset',
+      annotations: SYNTH_MUTATING_ANNOTATIONS,
       description:
         'Instantly load a complete, curated starting sound (all 3 oscillators, filter, ' +
         'envelope, and effect at once), then optionally fine-tune individual parameters with ' +
         'the other tools afterward. Use this as a fast, reliable first move for a vague request ' +
-        'before nudging individual knobs — e.g. "lo-fi beat" -> load_preset("lofi_beat") then ' +
-        'optionally tweak cutoff further. Available presets: ' +
+        'before nudging individual knobs — e.g. "lo-fi beat" -> synth_load_preset("lofi_beat") ' +
+        'then optionally tweak cutoff further. Available presets: ' +
         PRESETS.map((p) => `"${p.id}" (${p.name})`).join(', ') + '.',
       inputSchema: {
         type: 'object',
@@ -203,11 +249,13 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
       },
       execute: async ({ preset: presetId, reason }) => {
         const preset = PRESETS.find((p) => p.id === presetId);
-        if (!preset) return `Unknown preset: ${presetId}`;
+        if (!preset) {
+          return `Error: unknown preset "${presetId}". Valid ids are: ${PRESETS.map((p) => p.id).join(', ')}.`;
+        }
         engine.loadPreset(preset);
         applyPresetToUI(preset, { oscUIs, filterUI, envelopeUI, effectUI });
         // Demonstrate the resulting envelope shape, same as a manually
-        // triggered set_envelope — a preset changes it just as much.
+        // triggered synth_set_envelope — a preset changes it just as much.
         engine.auditionNote();
         // A preset replaces every module, so it annotates every module — and
         // the result handed back to the model spells out all of them. Reporting
@@ -218,12 +266,13 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         const applied = MODULE_PARAMS
           .map((p) => `${MODULE_LABELS[p]} — ${describeModule(engine, p)}`)
           .join('; ');
-        logCall('load_preset', { preset: presetId, reason }, applied);
+        logCall('synth_load_preset', { preset: presetId, reason }, applied);
         return `Loaded preset "${preset.name}". Full resulting patch: ${applied}.`;
       },
     },
     {
-      name: 'explain_parameter',
+      name: 'synth_explain_parameter',
+      annotations: SYNTH_READONLY_ANNOTATIONS,
       description:
         'Return a plain-language, beginner-friendly explanation of what a synth parameter ' +
         'category does and why it matters, using terminology a beginner could later recognize ' +
@@ -241,7 +290,8 @@ function buildToolDefs({ engine, oscUIs, filterUI, envelopeUI, effectUI }) {
         // current shape play out is most useful — demonstrate it live
         // rather than only describing it in prose.
         if (parameter === 'envelope') engine.auditionNote();
-        return PARAM_EXPLANATIONS[parameter] || 'Unknown parameter.';
+        return PARAM_EXPLANATIONS[parameter] ||
+          `Error: unknown parameter "${parameter}". Valid values are: ${Object.keys(PARAM_EXPLANATIONS).join(', ')}.`;
       },
     },
   ];
@@ -258,6 +308,11 @@ function registerWebMcpTools(toolDefs) {
       name: def.name,
       description: def.description,
       inputSchema: def.inputSchema,
+      // Advisory hints (readOnlyHint/destructiveHint/idempotentHint/
+      // openWorldHint) — passed through even though WebMCP's current spec
+      // doesn't formally define this field yet, since it mirrors MCP's own
+      // tool annotations and a spec-unaware host will just ignore it.
+      annotations: def.annotations,
       execute: def.execute,
     });
   });

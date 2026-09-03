@@ -717,7 +717,10 @@ body {
    glass screen rather than inside it, so they never compete with the curve
    itself. left% is the identical log-frequency fraction the canvas gridline
    for that same tick is drawn at, so a label always lines up with its line. */
-.filter-curve-wrap { position: relative; }
+.filter-curve-wrap { position: relative; margin-bottom: 22px; }
+/* Extra top margin clears the frequency-tick labels sitting just under the
+   curve (see .filter-freq-tick), so the type buttons don't crowd them. */
+.filter-type-mini { margin-top: 4px; }
 .filter-freq-tick {
   position: absolute;
   top: 100%;

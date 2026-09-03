@@ -250,7 +250,29 @@ const FILTER_FREQ_TICKS = [
   { freq: 10000, label: '10k' },
 ];
 
-function drawFilterCurve(canvas, cutoff, resonance) {
+// One-pole-ish magnitude approximations per filter type — stylized for a
+// teaching graph, not a precise DSP plot, but each shape must actually match
+// what that type does or the graph would be actively misleading: lowpass
+// passes below cutoff and rolls off above, highpass is the mirror image, and
+// bandpass peaks at cutoff and rolls off on both sides, with resonance
+// narrowing the peak instead of just adding a bump on top of it.
+function filterMagnitude(type, ratio, resonance) {
+  const logRatio = Math.log(ratio);
+  if (type === 'highpass') {
+    const bump = 1 + (resonance / 20) * Math.exp(-(logRatio * logRatio) * 4);
+    return (1 / Math.sqrt(1 + Math.pow(1 / ratio, 4))) * bump;
+  }
+  if (type === 'bandpass') {
+    // Higher resonance -> narrower peak, same role Q plays on a real
+    // bandpass filter rather than an additive bump like lowpass/highpass.
+    const width = 1.5 + (20 - resonance) * 0.15;
+    return Math.exp(-(logRatio * logRatio) / (2 * width * width * 0.04));
+  }
+  const bump = 1 + (resonance / 20) * Math.exp(-(logRatio * logRatio) * 4);
+  return (1 / Math.sqrt(1 + Math.pow(ratio, 4))) * bump;
+}
+
+function drawFilterCurve(canvas, cutoff, resonance, type = 'lowpass') {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
@@ -282,9 +304,7 @@ function drawFilterCurve(canvas, cutoff, resonance) {
   for (let i = 0; i <= points; i++) {
     const freq = 20 * Math.pow(1000, i / points); // 20Hz..20kHz log sweep
     const ratio = freq / cutoff;
-    // simple one-pole-ish lowpass magnitude approximation with resonance bump
-    const resonanceBump = 1 + (resonance / 20) * Math.exp(-Math.pow(Math.log(ratio), 2) * 4);
-    const mag = (1 / Math.sqrt(1 + Math.pow(ratio, 4))) * resonanceBump;
+    const mag = filterMagnitude(type, ratio, resonance);
     const x = clamp((i / points) * w, margin, w - margin);
     const y = clamp(h - Math.min(mag, 1.4) * (h * 0.72), margin, h - margin);
     if (i === 0) ctx.moveTo(x, y);
@@ -295,6 +315,35 @@ function drawFilterCurve(canvas, cutoff, resonance) {
   ctx.strokeStyle = style.getPropertyValue('--accent').trim() || '#7effc0';
   ctx.lineWidth = 2;
   ctx.stroke();
+}
+
+const FILTER_TYPE_LABELS = { lowpass: 'LP', highpass: 'HP', bandpass: 'BP' };
+const FILTER_TYPE_SPEC = {
+  lowpass: 'LOWPASS · 12 dB/OCT',
+  highpass: 'HIGHPASS · 12 dB/OCT',
+  bandpass: 'BANDPASS · 12 dB/OCT',
+};
+
+// Three small toggle buttons, same visual language as the oscillator
+// waveform selector (buildWaveformMini) — text labels instead of waveform
+// icons, since "lowpass/highpass/bandpass" doesn't have an obvious glyph.
+function buildFilterTypeSelector(engine, onChange) {
+  const wrap = el('div', 'wave-mini filter-type-mini');
+  const buttons = FILTER_TYPES.map((type) => {
+    const btn = el('button', 'wave-mini-btn' + (type === engine.filterType ? ' active' : ''), [FILTER_TYPE_LABELS[type]]);
+    btn.dataset.type = type;
+    btn.title = `${type} filter`;
+    btn.addEventListener('click', () => {
+      buttons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      engine.setFilter({ type });
+      onChange?.(type);
+    });
+    wrap.append(btn);
+    return btn;
+  });
+  wrap._setActive = (type) => buttons.forEach((b) => b.classList.toggle('active', b.dataset.type === type));
+  return wrap;
 }
 
 function buildFilterModule(engine, onLogged) {
@@ -318,7 +367,10 @@ function buildFilterModule(engine, onLogged) {
   });
   module.append(el('div', 'filter-curve-wrap', [canvas, ...freqTicks]));
 
-  const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ);
+  const redraw = () => drawFilterCurve(canvas, engine.filterFreq, engine.filterQ, engine.filterType);
+
+  const typeSelector = buildFilterTypeSelector(engine, () => { redraw(); updateSpec(); onLogged('filter'); });
+  module.append(typeSelector);
 
   const cutoffKnob = createKnob({
     label: 'Cutoff',
@@ -337,17 +389,29 @@ function buildFilterModule(engine, onLogged) {
     scaleMin: '0', scaleMax: '20',
     onChange: (q) => { engine.setFilter({ resonance: q }); redraw(); onLogged('filter'); },
   });
+  const envAmountKnob = createKnob({
+    label: 'Env Amt',
+    posMin: -4, posMax: 4, step: 0.1,
+    initialPos: engine.filterEnvAmount,
+    format: (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} oct`,
+    scaleMin: '-4', scaleMax: '+4',
+    onChange: (amt) => { engine.setFilter({ envAmount: amt }); onLogged('filter'); },
+  });
 
-  module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el]));
-  module.append(moduleSpec('LOWPASS · 12 dB/OCT'));
+  module.append(el('div', 'knob-row', [cutoffKnob.el, resonanceKnob.el, envAmountKnob.el]));
+  const specEl = moduleSpec(FILTER_TYPE_SPEC[engine.filterType]);
+  const updateSpec = () => { specEl.textContent = FILTER_TYPE_SPEC[engine.filterType] || FILTER_TYPE_SPEC.lowpass; };
+  module.append(specEl);
   module.append(annotationSlot('filter'));
   redraw();
 
   return {
     module,
-    setState({ cutoff, resonance }) {
+    setState({ cutoff, resonance, type, envAmount }) {
       if (cutoff != null) cutoffKnob.setReal(cutoff);
       if (resonance != null) resonanceKnob.setReal(resonance);
+      if (type != null) { typeSelector._setActive(type); updateSpec(); }
+      if (envAmount != null) envAmountKnob.setReal(envAmount);
       redraw();
     },
   };
@@ -817,7 +881,17 @@ function randomPreset() {
       detune: Math.round(rand(-15, 15)),
       semitone: pick([-12, -12, 0, 0, 0, 7, 12]),
     })),
-    filter: { cutoff: Math.round(rand(300, 8000)), resonance: rand(0, 8) },
+    filter: {
+      cutoff: Math.round(rand(300, 8000)),
+      resonance: rand(0, 8),
+      // Weighted toward lowpass (the common case) with highpass/bandpass in
+      // the mix so Surprise-me can actually surface them.
+      type: pick(['lowpass', 'lowpass', 'lowpass', 'highpass', 'bandpass']),
+      // Half the time no sweep at all — a filter envelope should read as a
+      // deliberate, occasional character, not something every random patch
+      // does.
+      envAmount: Math.random() > 0.5 ? rand(-3, 3) : 0,
+    },
     envelope: {
       attack: rand(0.001, 0.8),
       decay: rand(0.05, 0.6),

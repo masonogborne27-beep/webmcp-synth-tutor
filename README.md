@@ -97,12 +97,22 @@ basic abuse protection, since one key now covers every visitor's usage.
 
 | Tool | Purpose |
 | --- | --- |
-| `set_oscillator` | Set waveform / level / detune / semitone for oscillator 1, 2, or 3 |
-| `set_filter` | Adjust cutoff and/or resonance |
-| `set_envelope` | Adjust attack / decay / sustain / release |
-| `set_effect` | Toggle the delay and set its dry/wet mix |
-| `load_preset` | Instantly load one of the 6 curated starting sounds |
-| `explain_parameter` | Plain-language explanation of a parameter category, for standalone questions |
+| `synth_set_oscillator` | Set waveform / level / detune / semitone for oscillator 1, 2, or 3 |
+| `synth_set_filter` | Adjust type (lowpass/highpass/bandpass), cutoff, resonance, and/or filter-envelope amount |
+| `synth_set_envelope` | Adjust attack / decay / sustain / release |
+| `synth_set_effect` | Toggle the delay and set its dry/wet mix |
+| `synth_load_preset` | Instantly load one of the 6 curated starting sounds |
+| `synth_explain_parameter` | Plain-language explanation of a parameter category, for standalone questions |
+
+Tool names carry a `synth_` prefix so they stay unambiguous if a browsing agent has other
+pages' WebMCP tools registered at the same time.
+
+The filter's `envAmount` (-4 to +4 octaves) sweeps the cutoff open or closed over each note's
+attack/decay/sustain, reusing the amplitude envelope's own timing — this is what makes a
+"pluck" or "wow" sound rather than a static tone; the Bright Pluck preset is built around it.
+It has no dedicated visual on the response-curve graph (a static graph can't show a sweep over
+time) but is otherwise a first-class parameter — its own knob, in every preset's data, and in
+the tool schema.
 
 The five mutating tools accept an optional `reason` string in their input schema — the
 agent is prompted (via the tool description) to always include a short, beginner-friendly

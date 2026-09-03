@@ -24,6 +24,11 @@ const DEFAULT_OSCILLATORS = [
 const DELAY_TIME_S = 0.28;
 const DELAY_FEEDBACK = 0.35;
 
+// The filter's selectable shapes — shared by the UI's type selector and the
+// WebMCP tool's schema enum, so both are always in sync with what
+// BiquadFilterNode actually supports here.
+const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass'];
+
 // The canonical list of things that can carry a value, an annotation bubble,
 // and a line in the agent's reply. Keyed the same everywhere.
 const MODULE_PARAMS = ['oscillator-0', 'oscillator-1', 'oscillator-2', 'filter', 'envelope', 'effect'];
@@ -50,7 +55,10 @@ function describeModule(engine, param) {
     return `${osc.waveform}, level ${osc.level.toFixed(2)}, tune ${tune} st, detune ${osc.detune}¢`;
   }
   if (param === 'filter') {
-    return `cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}`;
+    const envPart = engine.filterEnvAmount
+      ? `, env amount ${engine.filterEnvAmount > 0 ? '+' : ''}${engine.filterEnvAmount.toFixed(1)} oct`
+      : '';
+    return `${engine.filterType}, cutoff ${Math.round(engine.filterFreq)} Hz, resonance ${engine.filterQ.toFixed(1)}${envPart}`;
   }
   if (param === 'envelope') {
     const e = engine.envelope;
@@ -73,7 +81,23 @@ function describePatchCharacter(engine) {
   const { filterFreq: cutoff, filterQ: q, envelope: env, oscillators: oscs } = engine;
   const words = [];
 
-  if (cutoff < 500) words.push('DARK');
+  // The DARK->SHARP ladder describes a lowpass specifically (low cutoff
+  // removes highs -> dark; high cutoff lets everything through -> sharp).
+  // A highpass or bandpass filter doesn't shape brightness the same way — a
+  // highpass thins out the low end instead, and a bandpass is dominated by
+  // its narrowness regardless of where that narrow band sits — so each type
+  // gets its own accurate word set rather than reusing lowpass language that
+  // would describe the wrong thing.
+  if (engine.filterType === 'highpass') {
+    if (cutoff < 200) words.push('FULL');
+    else if (cutoff < 800) words.push('LEAN');
+    else if (cutoff < 2500) words.push('THIN');
+    else words.push('BRITTLE');
+  } else if (engine.filterType === 'bandpass') {
+    if (cutoff < 1000) words.push('MUFFLED');
+    else if (cutoff < 4000) words.push('NASAL');
+    else words.push('PIERCING');
+  } else if (cutoff < 500) words.push('DARK');
   else if (cutoff < 1200) words.push('WARM');
   else if (cutoff < 3000) words.push('MELLOW');
   else if (cutoff < 8000) words.push('BRIGHT');
@@ -157,6 +181,13 @@ class SynthEngine {
     this.oscillators = DEFAULT_OSCILLATORS.map((o) => ({ ...o }));
     this.filterFreq = 2000;
     this.filterQ = 1;
+    this.filterType = 'lowpass';
+    // In octaves, applied on top of the base cutoff for the life of a note:
+    // 0 means the filter just sits at cutoff, doing nothing over time. A
+    // classic "pluck" is +2 to +4 here — the filter snaps open on attack
+    // then falls back down through decay, same shape as the amp envelope
+    // but reused for cutoff movement instead of loudness.
+    this.filterEnvAmount = 0;
     this.envelope = { attack: 0.02, decay: 0.15, sustain: 0.6, release: 0.3 };
     this.effect = { enabled: false, mix: 0.3 };
     this.activeVoice = null;
@@ -209,7 +240,7 @@ class SynthEngine {
     const ctx = this.ctx;
 
     this.filterNode = ctx.createBiquadFilter();
-    this.filterNode.type = 'lowpass';
+    this.filterNode.type = this.filterType;
     this.filterNode.frequency.value = this.filterFreq;
     this.filterNode.Q.value = this.filterQ;
 
@@ -276,7 +307,7 @@ class SynthEngine {
     this._notifyChange(`oscillator-${index}`);
   }
 
-  setFilter({ cutoff, resonance } = {}) {
+  setFilter({ cutoff, resonance, type, envAmount } = {}) {
     if (cutoff != null) {
       this.filterFreq = cutoff;
       if (this.filterNode) {
@@ -289,6 +320,11 @@ class SynthEngine {
         this.filterNode.Q.setTargetAtTime(resonance, this.ctx.currentTime, 0.01);
       }
     }
+    if (type != null) {
+      this.filterType = type;
+      if (this.filterNode) this.filterNode.type = type;
+    }
+    if (envAmount != null) this.filterEnvAmount = envAmount;
     this._notifyChange('filter');
   }
 
@@ -364,6 +400,24 @@ class SynthEngine {
       now + attack + Math.max(decay, 0.001)
     );
 
+    // Filter envelope: the same attack/decay/sustain shape as the amp
+    // envelope above, reused to sweep cutoff instead of loudness. Octave-
+    // based (not raw Hz) so a given amount sweeps the same musical distance
+    // regardless of where the base cutoff sits — +2 oct on a 300Hz cutoff
+    // reaches 1200Hz, and +2 oct on a 3000Hz cutoff reaches 12000Hz, matching
+    // how filter envelope depth actually behaves on real synths. Skipped
+    // entirely when the amount is 0, which is the common case, rather than
+    // scheduling automation that would just hold the cutoff at its own value.
+    if (this.filterEnvAmount !== 0) {
+      const base = this.filterFreq;
+      const peak = clamp(base * Math.pow(2, this.filterEnvAmount), 20, 20000);
+      const sustainFreq = clamp(base * Math.pow(2, this.filterEnvAmount * sustain), 20, 20000);
+      this.filterNode.frequency.cancelScheduledValues(now);
+      this.filterNode.frequency.setValueAtTime(base, now);
+      this.filterNode.frequency.linearRampToValueAtTime(peak, now + Math.max(attack, 0.001));
+      this.filterNode.frequency.linearRampToValueAtTime(sustainFreq, now + attack + Math.max(decay, 0.001));
+    }
+
     this.activeVoice = { voices, mixNode, envGain, baseFreq: freq };
     this._notifyNote('on');
   }
@@ -392,6 +446,14 @@ class SynthEngine {
     envGain.gain.cancelScheduledValues(now);
     envGain.gain.setValueAtTime(envGain.gain.value, now);
     envGain.gain.linearRampToValueAtTime(0, now + release);
+
+    // Release the filter envelope back to the resting cutoff over the same
+    // release time, mirroring the amp envelope's tail.
+    if (this.filterEnvAmount !== 0) {
+      this.filterNode.frequency.cancelScheduledValues(now);
+      this.filterNode.frequency.setValueAtTime(this.filterNode.frequency.value, now);
+      this.filterNode.frequency.linearRampToValueAtTime(this.filterFreq, now + release);
+    }
 
     const stopAt = now + release + 0.05;
     voices.forEach(({ osc }) => {
